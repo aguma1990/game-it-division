@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+# aset 3D lama yang tidak dipakai game
+BankITDirector_CharacterAssets/
+BankITDirector_CharacterAssets_GLB.zip

@@ -1,0 +1,36 @@
+{
+  "name": "Neko Bank IT — Kantor TI Isometrik",
+  "short_name": "Neko Bank IT",
+  "description": "Game simulasi mengelola divisi TI bank dengan karakter anime chibi: beli mesin kopi, main PS, dan bikin nasabah tersenyum!",
+  "lang": "id",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#17402f",
+  "theme_color": "#10372b",
+  "categories": [
+    "games",
+    "simulation"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "neko-bank-it-kawaii",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Neko Bank IT - game PWA simulasi divisi TI bank dengan karakter anime chibi",
+  "scripts": {
+    "start": "python3 -m http.server 8080"
+  }
+}

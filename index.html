@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#10372b">
+  <meta name="description" content="Neko Bank IT — game simulasi mengelola divisi TI bank dengan karakter anime chibi yang imut.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Neko Bank IT">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/style.css">
+  <title>Neko Bank IT</title>
+</head>
+<body>
+  <div id="app" hidden>
+    <header id="hud">
+      <div class="hud-top">
+        <button class="dir" id="dirBtn" aria-label="Profil Direktur"><img id="dirAvatar" alt=""><span class="lvl-badge" id="lvlBadge">1</span></button>
+        <div class="dir-info">
+          <div class="dir-name"><b id="dirName">Direktur</b><span id="stars" class="stars"></span></div>
+          <div class="dir-title" id="dirTitle">Staf Magang</div>
+          <div class="xpbar"><i id="xpFill"></i><span id="xpText"></span></div>
+        </div>
+        <div class="pill money" id="money" title="Anggaran divisi">Rp 0</div>
+        <button class="icon-btn" id="settingsBtn" aria-label="Pengaturan">⚙️</button>
+      </div>
+      <div class="hud-bottom">
+        <div class="pill day" id="dayChip"><span id="dayText">Hari 1</span><b id="hourText">08:00</b></div>
+        <div class="stats" id="stats">
+          <div class="stat" id="stMood" title="Mood tim"><span>💚</span><div class="sbar"><i></i></div><b>0</b></div>
+          <div class="stat" id="stSec" title="Keamanan"><span>🛡️</span><div class="sbar"><i></i></div><b>0</b></div>
+          <div class="stat" id="stSvc" title="Layanan"><span>📶</span><div class="sbar"><i></i></div><b>0</b></div>
+          <div class="stat risk" id="stRisk" title="Risiko (makin rendah makin baik)"><span>⚠️</span><div class="sbar"><i></i></div><b>0</b></div>
+        </div>
+        <div class="speed" id="speed">
+          <button data-speed="0" aria-label="Jeda">⏸</button>
+          <button data-speed="1" aria-label="Normal">▶</button>
+          <button data-speed="2" aria-label="Cepat">⏩</button>
+          <button data-speed="3" aria-label="Sangat cepat">⏭</button>
+        </div>
+      </div>
+      <div class="side-log" id="sideLog"></div>
+    </header>
+
+    <main id="stage">
+      <canvas id="scene" aria-label="Kantor Divisi TI"></canvas>
+      <div id="zoom"><button id="zIn" aria-label="Perbesar">＋</button><button id="zOut" aria-label="Perkecil">－</button><button id="zReset" aria-label="Reset tampilan">⌖</button></div>
+      <div id="hint" hidden></div>
+      <div id="toasts"></div>
+    </main>
+
+    <nav id="nav">
+      <button data-tab="tasks"><span class="ni">📋</span><span class="nl">Tugas</span><i class="dot" id="dotTasks"></i></button>
+      <button data-tab="team"><span class="ni">👥</span><span class="nl">Tim</span><i class="dot" id="dotTeam"></i></button>
+      <button data-tab="inbox"><span class="ni">📥</span><span class="nl">Inbox</span><i class="dot" id="dotInbox"></i></button>
+      <button data-tab="shop"><span class="ni">🛍️</span><span class="nl">Toko</span><i class="dot" id="dotShop"></i></button>
+      <button data-tab="missions"><span class="ni">🎯</span><span class="nl">Misi</span><i class="dot" id="dotMissions"></i></button>
+    </nav>
+
+    <aside id="panel" aria-live="polite">
+      <div class="panel-head"><span class="grab"></span><h2 id="panelTitle"></h2><button class="icon-btn" id="panelClose" aria-label="Tutup">✕</button></div>
+      <div id="panelBody"></div>
+    </aside>
+  </div>
+
+  <div id="modal" hidden></div>
+  <div id="title" hidden></div>
+  <noscript>Game ini memerlukan JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
