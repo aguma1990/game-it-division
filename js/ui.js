@@ -87,11 +87,11 @@ export class UI {
   statusText(e) {
     const g = this.g;
     switch (e.st) {
-      case 'sick': return '😵 Burnout — sedang pulih';
+      case 'sick': return e.hidden ? '🏖️ Sedang cuti (di luar kantor)' : '😵 Burnout — sedang pulih';
       case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
       case 'act': return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
       case 'queue': return '⏳ Antri fasilitas';
-      case 'walk': return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
+      case 'walk': if (e.onLeave) return '🚪 Berjalan ke pintu (cuti)'; if (e.leaving) return '🚪 Meninggalkan kantor'; return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
       case 'work': { const t = g.task(e.task); return `💼 ${t ? t.title : 'Bekerja'}`; }
       default: return e.task ? '🚶 Menuju meja' : '💤 Menganggur — beri tugas!';
     }
@@ -193,8 +193,8 @@ export class UI {
     const tc = g.trainCost(e);
     return `<div class="card ${this.focus === e.id ? 'focus' : ''}" id="emp-${e.id}">
       <div class="row"><div class="av" style="--rc:${R.color}"><img src="${portrait(e.look, e.spec, 'smile', 72)}" alt=""><span class="rar">${R.name}</span></div>
-        <div class="grow"><div class="t-title">${esc(e.name)} <span class="chip">Lv.${e.lvl}</span></div>
-          <div class="t-sub">${sp.emoji} ${sp.name}</div>
+        <div class="grow"><div class="t-title">${esc(e.name)} <span class="chip">Lv.${e.lvl}</span>${e.sp ? ` <span class="chip late">SP${e.sp}</span>` : ''}</div>
+          <div class="t-sub">${sp.emoji} ${sp.name}</div>${(() => { const sg = g.suggestFor(e); return sg ? `<button class="btn sm ${sg.kind === 'fire' ? '' : 'gold'}" data-act="sugg" data-k="${sg.kind}" data-id="${e.id}" style="margin:5px 0 2px;${sg.kind === 'fire' ? 'background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e;' : ''}">💡 Saran: ${sg.kind === 'fire' ? '🚪 Pecat' : '📄 Beri Surat Peringatan'} <small>(${sg.why})</small></button>` : ''; })()}
           <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 Skill ${e.skill}</span><span class="chip">💸 ${fmtMoney(e.salary)}/hari</span></div></div></div>
       <div class="t-sub" style="margin-top:6px">${tr.desc}</div>
       <div class="bars">
@@ -208,7 +208,7 @@ export class UI {
   }
   teamView() {
     const g = this.g, s = g.s, crew = s.employees.filter(e => !e.leaving);
-    const sig = 'M' + this.focus + crew.map(e => e.id + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.snack ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
+    const sig = 'M' + this.focus + crew.map(e => e.id + (e.suggK || '') + (e.sp || 0) + (e.hidden ? 'h' : '') + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.snack ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
     let html = `<div class="sec-title"><span>Tim kamu (${crew.length}/${g.totalDesks()} meja)</span></div>`;
     if (!crew.length) html += `<div class="empty"><span class="big">🪑</span>Belum ada karyawan.</div>`;
     html += crew.map(e => this.empCard(e)).join('');
@@ -293,6 +293,7 @@ export class UI {
       case 'hire': sfx('tap'); this.showNameDialog(id, false); return;
       case 'rename': sfx('tap'); this.showNameDialog(id, true); return;
       case 'fire': sfx('tap'); this.showFireDialog(id); return;
+      case 'sugg': sfx('tap'); if (k === 'fire') this.showFireDialog(id); else this.showSummonDialog(id); return;
       case 'summon': sfx('tap'); this.showSummonDialog(id); return;
       case 'reroll': g.rerollCandidates(); break;
       case 'buyfac': g.buyFacility(k); break;
@@ -463,6 +464,7 @@ export class UI {
     const root = this.openModal(`<div class="av" style="--rc:${RARITY[e.rarity].color};width:84px;height:84px;margin:0 auto"><img src="${portrait(e.look, e.spec, 'stress', 84)}" alt=""></div>
       <h2>Panggil ${esc(e.name)}</h2><p>${SPECS[e.spec].emoji} ${SPECS[e.spec].name} · ⚡${Math.round(e.energy)} · 😣${Math.round(e.stress)} · 💚${Math.round(e.mood)}<br>Dia akan berjalan ke ruang Kepala Divisi. Pilih gayamu:</p>
       <div class="choices"><button class="choice" data-m="marah">😡 Marah-marah<small>Stres +, mood − (tim yang melihat jadi takut). Dia jadi terpacu 45 dtk. Bisa resign kalau mood sudah rendah!</small></button>
+      <button class="choice" data-m="sp">📄 Surat Peringatan${e.suggK === 'sp' ? ' 💡 (disarankan)' : ''}<small>Resmi tercatat (SP${(e.sp || 0) + 1}). Mood turun, tapi dia jadi fokus 40 dtk. Setelah SP ke-3 disarankan pecat.</small></button>
       <button class="choice" data-m="tegur">😐 Tegur halus<small>Stres naik sedikit, jadi fokus sementara. Aman.</small></button>
       <button class="choice" data-m="semangat">🤗 Beri semangat<small>Mood naik, stres turun, dan bersemangat sementara.</small></button></div>
       <button class="btn ghost block" style="margin-top:10px" data-close>Batal</button>`);
@@ -477,7 +479,7 @@ export class UI {
     const g = this.g, e = g.emp(id); if (!e) return;
     const cost = g.fireCost(e), dept = DEPTS[deptOfSpec(e.spec)];
     const root = this.openModal(`<div class="av" style="--rc:${RARITY[e.rarity].color};width:84px;height:84px;margin:0 auto"><img src="${portrait(e.look, e.spec, 'stress', 84)}" alt=""></div>
-      <h2>Pecat ${esc(e.name)}?</h2><p>${SPECS[e.spec].emoji} ${SPECS[e.spec].name} · Lv.${e.lvl} · Skill ${e.skill}</p>
+      <h2>Pecat ${esc(e.name)}?</h2>${e.suggK === 'fire' ? '<p style="color:#d6334f;font-weight:800">💡 Disarankan: kinerja buruk & SP sudah diberikan.</p>' : ''}<p>${SPECS[e.spec].emoji} ${SPECS[e.spec].name} · Lv.${e.lvl} · Skill ${e.skill}</p>
       <div class="kv"><span>💸 Pesangon (3× gaji harian)</span><b class="r">−${fmtMoney(cost)}</b><span>🪑 Meja ${dept.name}</span><b class="g">jadi kosong</b><span>💚 Mood tim lain</span><b class="r">−4</b></div>
       <p style="margin:6px 0 10px">Tiket yang sedang dikerjakan akan kembali ke antrean. Kamu bisa langsung merekrut pengganti di tab Tim.</p>
       <button class="btn block" id="okFire" style="background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e" ${g.s.money < cost ? 'disabled' : ''}>🚪 Ya, pecat</button><button class="btn ghost block" style="margin-top:8px" data-close>Batal</button>`);

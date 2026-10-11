@@ -1,7 +1,7 @@
 // Penggambar dunia isometrik (kantor tampak dari atas): lantai, dinding, sekat kaca, furnitur, zona.
 import { TW, TH, OX, OY, SPECS, DEPTS, DEPT_KEYS } from './data.js';
 import { rr, ell, star4, shade } from './chibi.js';
-import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS } from './game.js';
+import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS, ENTRY } from './game.js';
 
 const TAU = Math.PI * 2;
 export const FONT = 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Nunito", system-ui, sans-serif';
@@ -385,6 +385,18 @@ export function collectProps(g, t, hour, using, push) {
       ctx.strokeStyle = busy ? '#7fffd4' : '#3d5f58'; ctx.lineWidth = 1.5; for (let r = 0; r < 3; r++) { const p1 = P(st.x - 0.2, 12.22, 30 + r * 4), p2 = P(st.x - 0.2 + 0.1 + ((t * 0.5 + r * 0.13 + i * 0.07) % 0.3), 12.22, 30 + r * 4); ctx.beginPath(); ctx.moveTo(...p1); ctx.lineTo(...p2); ctx.stroke(); }
     });
   }
+  // --- pintu masuk / keluar (dinding belakang, ujung lorong tegak) ---
+  push(-1.5, ctx => {
+    const o = Math.max(0, Math.min(1, g.doorOpen || 0)), x0 = ENTRY.x - 0.45, x1 = ENTRY.x + 0.45, H = 66;
+    poly(ctx, [P(x0 - 0.1, 0, 0), P(x1 + 0.1, 0, 0), P(x1 + 0.1, 0, H + 6), P(x0 - 0.1, 0, H + 6)], '#2f7a55', '#1f5a3c', 2);          // kusen
+    const gr = ctx.createLinearGradient(...P(x0, 0, H), ...P(x0, 0, 0)); gr.addColorStop(0, '#e9fbff'); gr.addColorStop(1, '#bfe6c9');
+    poly(ctx, [P(x0, 0, 0), P(x1, 0, 0), P(x1, 0, H), P(x0, 0, H)], o > 0.05 ? gr : '#c98a56', '#1f5a3c', 1.5);
+    if (o <= 0.05) { const h = P(x1 - 0.1, 0, 30); ctx.fillStyle = '#ffd84d'; ctx.beginPath(); ctx.arc(h[0], h[1], 3, 0, TAU); ctx.fill(); poly(ctx, [P(x0 + 0.15, 0, 40), P(x1 - 0.15, 0, 40), P(x1 - 0.15, 0, 58), P(x0 + 0.15, 0, 58)], '#bfe9f5', '#8a5a3c', 1.5); }
+    else poly(ctx, [P(x0, 0, 0), P(x0, 0.85 * o, 0), P(x0, 0.85 * o, H), P(x0, 0, H)], '#b87a48', '#6b4426', 1.5);                         // daun pintu terbuka ke dalam
+    const [mx, my] = P(ENTRY.x, 0, H + 20); rr(ctx, mx - 48, my - 8, 96, 16, 7); ctx.fillStyle = '#17402f'; ctx.fill(); ctx.strokeStyle = '#5fe39a'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#bff5d4'; ctx.font = font(900, 9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('MASUK / KELUAR', mx, my + 0.5);
+    const [rx, ry] = P(ENTRY.x, 0.55, 0); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ell(ctx, rx, ry, 30, 10); ctx.fill();                       // keset
+  });
   // --- pantry ---
   push(-1, ctx => {   // counter menempel di dinding belakang → selalu di belakang karakter
     box(ctx, 0.8, 0.14, 4.6, 0.92, 36, '#f1ebd9', 0, { top: '#9bd8b3', right: '#cfc8b0' });
@@ -439,7 +451,7 @@ export function collectProps(g, t, hour, using, push) {
   meetingProps(g, t, push, MEET_SEATS); poolProps(g, t, push);
   // --- tanaman ---
   [[0.55, 4.5], [6.4, 4.6], [15.4, 4.5], [6.5, 14.6], [15.4, 14.7]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1)));
-  if (s.decor.plant) [[6.25, 1.0], [0.6, 9.5], [15.3, 9.4], [11.1, 14.7]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.3)));
+  if (s.decor.plant) [[0.6, 9.5], [15.3, 9.4], [11.1, 14.7]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.3)));
   // --- taman bermain ---
   if (s.fac.play >= 2) push(11.4 + 14.0 + 1.0, ctx => {
     box(ctx, 11.4, 14.0, 0.8, 0.8, 46, '#ffd84d', 0, { top: '#ffe98a' });

@@ -1,7 +1,7 @@
 // Scene Canvas isometrik: kamera (geser/zoom), karyawan, Mochi, partikel, gelembung, hit-test.
 import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js';
 import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js';
-import { deskXY, route, V_X, C1_Y } from './game.js';
+import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js';
 import * as I from './iso.js';
 
 const TAU = Math.PI * 2;
@@ -24,10 +24,12 @@ export class Scene {
     canvas.addEventListener('pointerup', e => this.pup(e));
     canvas.addEventListener('pointercancel', e => { this.ptrs.delete(e.pointerId); });
     canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+    this.dir = { x: DIR_SEAT.x, y: DIR_SEAT.y, path: [], walking: false, flip: 1, act: null, init: false, greeted: new Set() };
+    game.on('dir', a => { this.dir.act = { pose: a.pose || 'wave', text: a.text || '', face: a.face, t: 0, dur: a.dur || 2.2 }; });
     game.on('fx', f => this.onFx(f));
     game.on('popup', p => this.onPopup(p));
     game.on('banner', b => { this.banner = { text: b.text, sub: b.sub, t: 0 }; });
-    game.on('newday', d => { this.nightFade = 1; this.banner = { text: `Hari ke-${d.day}`, sub: `Gaji tim −${fmtMoney(d.salary)}`, t: 0 }; });
+    game.on('newday', d => { this.dirEnter('Selamat pagi, semuanya! ☀️'); this.nightFade = 1; this.banner = { text: `Hari ke-${d.day}`, sub: `Gaji tim −${fmtMoney(d.salary)}`, t: 0 }; });
   }
 
   // ---------- Kamera ----------
@@ -125,6 +127,32 @@ export class Scene {
     const goal = r < 0.35 ? { x: 1 + Math.random() * 14, y: C1_Y } : r < 0.5 ? { x: 3.2, y: 2.8 } : r < 0.65 ? { x: 10, y: 2.9 } : r < 0.75 ? { x: 13, y: 3.3 } : r < 0.9 ? { x: V_X, y: 6 + Math.random() * 8 } : { x: 9 + Math.random() * 3, y: 9.2 };
     m.path = route(m.x, m.y, goal.x, goal.y);
   }
+  // Direktur datang lewat pintu, menyapa staf, lalu duduk di ruangannya
+  dirEnter(text) {
+    const d = this.dir; d.x = ENTRY.x; d.y = ENTRY.y; d.greeted.clear(); d.walking = true;
+    d.path = [...route(ENTRY.x, ENTRY.y, 17.5, DIR_SEAT.y), { x: DIR_SEAT.x, y: DIR_SEAT.y }];
+    d.act = { pose: 'wave', text, t: 0, dur: 2.6 };
+  }
+  updateDir(dt) {
+    const d = this.dir, g = this.g, s = g.s;
+    if (!d.init) { d.init = true; this.dirEnter(`Selamat datang di ${s.bank}! 🌿`); }
+    if (d.act) { d.act.t += dt; if (d.act.t > d.act.dur) d.act = null; }
+    if (d.walking) {
+      const st = d.path[0];
+      if (!st) { d.walking = false; d.x = DIR_SEAT.x; d.y = DIR_SEAT.y; }
+      else {
+        const dx = st.x - d.x, dy = st.y - d.y, dist = Math.hypot(dx, dy), sp = 2.4 * dt;
+        if (dist <= sp) { d.x = st.x; d.y = st.y; d.path.shift(); } else { d.x += dx / dist * sp; d.y += dy / dist * sp; d.flip = dx - dy >= 0 ? 1 : -1; }
+        for (const e of s.employees) {
+          if (e.hidden || e.leaving || d.greeted.has(e.id) || Math.hypot(e.x - d.x, e.y - d.y) > 2.8) continue;
+          d.greeted.add(e.id); if (!e.say) g.say(e, ['Selamat pagi, Bos! 🙇', 'Pagi, Bos~', 'Halo, Direktur! 👋'][Math.floor(Math.random() * 3)], 2.4);
+        }
+      }
+    }
+    const near = (x, y) => Math.hypot(x - ENTRY.x, y - ENTRY.y) < 2.2;
+    const busy = (d.walking && near(d.x, d.y)) || s.employees.some(e => !e.hidden && e.st === 'walk' && near(e.x, e.y));
+    g.doorOpen = (g.doorOpen || 0) + ((busy ? 1 : 0) - (g.doorOpen || 0)) * (1 - Math.exp(-dt * 8));
+  }
   updateMochi(dt) {
     const m = this.mochi;
     if (!m.path.length) { m.walking = false; m.wait -= dt; if (m.wait <= 0) { this.pickMochiGoal(); m.wait = 2 + Math.random() * 5; } return; }
@@ -136,7 +164,7 @@ export class Scene {
     const g = this.g, s = g.s; if (!s) return;
     const anim = s.speed === 0 || g.blocking ? 0.15 : 1 + 0.25 * (s.speed - 1);
     this.t += dt * anim;
-    this.updateMochi(dt);
+    this.updateMochi(dt); this.updateDir(dt);
     if (this.target) {
       const k = 1 - Math.exp(-dt * 6); this.cam.x = lerp(this.cam.x, this.target.x, k); this.cam.y = lerp(this.cam.y, this.target.y, k); this.cam.z = lerp(this.cam.z, this.target.z, k); this.clamp();
       if (Math.abs(this.cam.x - this.target.x) < 1 && Math.abs(this.cam.y - this.target.y) < 1) this.target = null;
@@ -156,6 +184,7 @@ export class Scene {
       this._spT = 0;
       for (const e of s.employees) {
         const w = this.worldPos(e.x, e.y, 70);
+        if (e.hidden) continue;
         if (e.st === 'sick' || (e.st === 'act' && e.act && e.act.kind === 'nap')) this.spawn({ kind: 'zzz', x: w.x + 12, y: w.y - 20, vx: 8, vy: -14, max: 1.8 });
         else if (e.st === 'act' && e.act && e.act.kind === 'ps') this.spawn({ kind: 'note', x: w.x + (Math.random() - 0.5) * 20, y: w.y - 28, vx: 6, vy: -22, max: 1.4 });
         else if (e.st === 'act' && e.act && e.act.kind === 'pool') this.spawn({ kind: 'spark', x: w.x + (Math.random() - 0.5) * 34, y: w.y + 10, vy: -16, max: 0.8 });
@@ -195,14 +224,14 @@ export class Scene {
     I.collectProps(g, t, hour, using, push);
     for (const e of s.employees) push(e.x + e.y + 0.02, ctx2 => this.drawEmp(ctx2, e, t));
     for (const e of s.employees) if (e.st === 'act' && e.act && e.act.kind === 'pool') push(e.x + e.y + 0.4, ctx2 => { const [wx, wy] = P(e.x, e.y, 0); ctx2.fillStyle = 'rgba(70,170,230,0.62)'; ell(ctx2, wx, wy - 2, 27, 12); ctx2.fill(); ctx2.strokeStyle = 'rgba(255,255,255,0.8)'; ctx2.lineWidth = 1.6; ell(ctx2, wx, wy - 2, 27 + Math.sin(t * 4) * 2, 12 + Math.sin(t * 4)); ctx2.stroke(); });
-    push(18.7 + 2.9 + 0.02, ctx2 => this.drawDirector(ctx2, t));
+    push(this.dir.walking ? this.dir.x + this.dir.y + 0.02 : 18.7 + 2.9 + 0.02, ctx2 => this.drawDirector(ctx2, t));
     const m = this.mochi; push(m.x + m.y, ctx2 => { const [x, y] = P(m.x, m.y); drawMochi(ctx2, { x, y, s: 1.1, t, dir: m.dir, walking: m.walking }); this.hits.push({ type: 'mochi', x0: x - 24, x1: x + 24, y0: y - 52, y1: y + 6, pri: 5 }); });
     if (s.fac.play === 1) g.slots.play.forEach(id => { const e = id && g.emp(id); if (e && e.st === 'act') push(e.x + e.y + 0.5, ctx2 => I.ballsFront(ctx2, e.x, e.y, t)); });
     items.sort((a, b) => a.d - b.d); for (const it of items) it.fn(ctx);
     if (this.gift) this.drawGift(ctx, t);
     this.drawTags(ctx, t);
     for (const e of s.employees) this.drawBubbles(ctx, e, t);
-    this.drawScold(ctx, t);
+    this.drawScold(ctx, t); this.drawDirBubble(ctx, t);
     this.drawParts(ctx, t);
     for (const p of this.petals) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(this.t + p.ph); ctx.fillStyle = 'rgba(200,255,200,0.7)'; ell(ctx, 0, 0, p.s, p.s * 0.55); ctx.fill(); ctx.restore(); }
     // overlay layar
@@ -220,15 +249,24 @@ export class Scene {
   }
 
   drawDirector(ctx, t) {
-    const s = this.g.s, [px, py] = P(18.7, 2.9, 18), writing = Math.sin(t * 0.35) > -0.2;
+    const s = this.g.s, d = this.dir, walking = d.walking, [px, py] = walking ? P(d.x, d.y, 0) : P(18.7, 2.9, 18), writing = Math.sin(t * 0.35) > -0.2, act = d.act;
     const sc = this.g.scold, mad = sc && sc.ready && sc.mode === 'marah', talk = sc && sc.ready;
-    const mood = this.g.avgMood(), face = mad ? 'stress' : talk && sc.mode === 'semangat' ? 'happy' : this.g.s.risk > 70 ? 'stress' : mood > 70 ? 'happy' : 'smile';
+    const mood = this.g.avgMood(), face = act && act.face ? act.face : mad ? 'stress' : talk && sc.mode === 'semangat' ? 'happy' : this.g.s.risk > 70 ? 'stress' : mood > 70 ? 'happy' : 'smile';
     this.hits.push({ type: 'boss', x0: px - 26, x1: px + 26, y0: py - 88, y1: py + 8, pri: 9 });
     const jx = mad ? Math.sin(t * 45) * 1.6 : 0;
-    drawChibi(ctx, { x: px + jx, y: py, s: S, look: s.dirLook, spec: 'dir', pose: mad ? 'cheer' : talk ? 'wave' : writing ? 'type' : 'sit', t, face, dir: 1, phase: 0.5 });
+    drawChibi(ctx, { x: px + jx, y: py, s: S, look: s.dirLook, spec: 'dir', pose: walking ? 'walk' : act ? act.pose : mad ? 'cheer' : talk ? 'wave' : writing ? 'type' : 'sit', t, face, dir: walking ? d.flip : 1, phase: 0.5 });
+  }
+  drawDirBubble(ctx, t) {
+    const d = this.dir, a = d.act, sc = this.g.scold; if (!a || !a.text || (sc && sc.ready && sc.text)) return;
+    const [px, py] = d.walking ? P(d.x, d.y, 0) : P(18.7, 2.9, 18), al = Math.min(1, a.t * 4, (a.dur - a.t) * 3), pop = 0.85 + 0.15 * Math.min(1, a.t * 5);
+    ctx.save(); ctx.globalAlpha = Math.max(0, al); ctx.font = font(900, 12); const w = Math.min(260, ctx.measureText(a.text).width + 24);
+    ctx.translate(px, py - 102); ctx.scale(pop, pop); rr(ctx, -w / 2, -14, w, 28, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#2fae6a'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(0, 22); ctx.lineTo(6, 14); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.fillStyle = '#1f3a2e'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(a.text, 0, 1); ctx.restore();
   }
 
   drawEmp(ctx, e, t) {
+    if (e.hidden) return;
     const s = this.g.s, lift = this.seatLift(e), [px, py] = P(e.x, e.y, lift);
     let pose = 'stand', held = null, face = 'smile', dir = 1;
     const low = e.energy < 25, hi = e.stress > 75;
@@ -254,6 +292,7 @@ export class Scene {
     if (e.face) face = e.face;
     this.hits.push({ type: 'emp', id: e.id, x0: px - 26, x1: px + 26, y0: py - 88, y1: py + 8, pri: 10 });
     drawChibi(ctx, { x: px, y: py, s: S, look: e.look, spec: e.spec, pose, t, face, dir, held, phase: e.desk * 1.7 });
+    if (e.suggK) { ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e.suggK === 'fire' ? '🚪' : '⚠️', px + 24, py - 78 + Math.sin(t * 4 + e.desk) * 2); }
     if (e.rarity === 'SSR' || e.rarity === 'SR') { const a = (t * 2 + e.desk) % TAU; star4(ctx, px + Math.cos(a) * 26, py - 44 + Math.sin(a * 1.3) * 22, 3, e.rarity === 'SSR' ? '#ffd84d' : '#c9b8ff'); }
   }
 
@@ -270,6 +309,7 @@ export class Scene {
   }
 
   drawBubbles(ctx, e, t) {
+    if (e.hidden) return;
     const lift = this.seatLift(e), [px, py] = P(e.x, e.y, lift), top = py - 86, x = px;
     ctx.save();
     if (e.claimBubble) {
