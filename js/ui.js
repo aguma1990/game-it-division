@@ -4,6 +4,7 @@ import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
 import { hasSave, clearSave } from './store.js';
+import { genLook } from './game.js';
 import { NAMES_F, NAMES_M, SURNAMES } from './data.js';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
@@ -510,6 +511,37 @@ export class UI {
       if (res.tier >= 1) g.s.stat.mgWins++;
       this.closeModal(); g.resolveRequest(reqId, 'approve', optKey, null, { tier: res.tier }); this.render(true); this.hud(true);
     });
+  }
+
+  // Wizard awal permainan: rekrut 1 staf untuk tiap bidang & beri nama
+  showStarterWizard(done) {
+    const g = this.g, depts = DEPT_KEYS.filter(d => !g.s.employees.some(e => deptOfSpec(e.spec) === d));
+    if (!depts.length) { g.s.starterDone = true; done(); return; }
+    let step = 0, cands = [], sel = 0, name = '', named = false;
+    const root = this.openModal('');
+    const newPool = () => { cands = g.starterPool(depts[step], g.s.employees.map(e => e.name)); sel = 0; name = cands[0].name; named = false; };
+    const paint = () => {
+      const d = depts[step], D = DEPTS[d], c = cands[sel], last = step === depts.length - 1;
+      root.innerHTML = `<div class="big-emoji">${D.emoji}</div><h2>Rekrut Tim Awal <small style="color:var(--ink2)">(${step + 1}/${depts.length})</small></h2>
+        <p><b>${D.name}</b> · ${D.sub}<br>Pilih 1 staf untuk bidang ini, lalu beri nama.</p>
+        <div class="sel-list">${cands.map((x, i) => `<button class="sel-item" data-i="${i}" style="${i === sel ? 'border-color:#2fb36d;box-shadow:0 0 0 3px #bfe8cf' : ''}"><div class="av sm" style="--rc:${RARITY[x.rarity].color}"><img src="${portrait(x.look, x.spec, 'happy', 40)}" alt=""></div><div class="grow" style="text-align:left"><div class="t-title">${esc(i === sel ? name || x.name : x.name)} <span class="chip" style="background:${RARITY[x.rarity].color}33;color:${RARITY[x.rarity].color}">${RARITY[x.rarity].label}</span></div><div class="t-sub">${SPECS[x.spec].emoji} ${SPECS[x.spec].name} · 💪${x.skill} · ${TRAITS[x.trait].emoji} ${TRAITS[x.trait].name}</div></div><span class="chip">${i === sel ? '✔' : '＋'}</span></button>`).join('')}</div>
+        <div class="acts" style="margin:6px 0"><button class="btn lav sm" id="sM">👦 Cowok</button><button class="btn lav sm" id="sF">👧 Cewek</button><button class="btn mint sm" id="sR">🔀 Acak tampilan</button><button class="btn ghost sm" id="sP">🔄 Calon lain</button></div>
+        <div class="field"><label>Nama staf</label><div class="row" style="gap:8px"><input id="stName" maxlength="14" value="${esc(name)}" autocomplete="off" style="flex:1"><button class="btn lav sm" id="sD" title="Nama acak">🎲</button></div></div>
+        <button class="btn block" id="stNext">${last ? 'Mulai Bekerja ✨' : 'Lanjut ➜'}</button>`;
+      const inp = root.querySelector('#stName'); inp.addEventListener('input', () => { name = inp.value; named = true; });
+      root.querySelectorAll('.sel-item').forEach(b => b.addEventListener('click', () => { sfx('tap'); sel = +b.dataset.i; name = cands[sel].name; named = false; paint(); }));
+      const regen = fem => { sfx('pop'); const x = cands[sel]; if (fem !== undefined) x.female = fem; x.look = genLook(x.female); if (!named || fem !== undefined) { name = randomName(x.female); x.name = name; named = false; } paint(); };
+      root.querySelector('#sM').addEventListener('click', () => regen(false));
+      root.querySelector('#sF').addEventListener('click', () => regen(true));
+      root.querySelector('#sR').addEventListener('click', () => regen());
+      root.querySelector('#sP').addEventListener('click', () => { sfx('pop'); newPool(); paint(); });
+      root.querySelector('#sD').addEventListener('click', () => { sfx('pop'); name = randomName(cands[sel].female); cands[sel].name = name; named = false; paint(); });
+      root.querySelector('#stNext').addEventListener('click', () => {
+        g.addStarter(cands[sel], name || cands[sel].name); sfx('hire'); step++;
+        if (step < depts.length) { newPool(); paint(); } else { g.s.starterDone = true; this.closeModal(); this.render(true); this.hud(true); done(); }
+      });
+    };
+    newPool(); paint();
   }
 
   showAssign(taskId) {

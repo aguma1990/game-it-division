@@ -116,14 +116,10 @@ export class Game {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, projects: [], fac: { coffee: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], fac: { coffee: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
     };
-    const used = [];
-    [['dev', 'R', false], ['ops', 'N', false], ['ctrl', 'R', true]].forEach(([sp, rar, fem], i) => {
-      const e = makeEmployee(sp, rar, used, fem); used.push(e.name); e.mood = 88; e.energy = 92; e.desk = this.freeDesk(sp); this.s.employees.push(e);
-    });
     this.initRuntime();
     for (let i = 0; i < 3; i++) this.spawnTask(['dev', 'ops', 'ctrl'][i], 'mid');
     this.genCandidates();
@@ -146,6 +142,7 @@ export class Game {
     if (hadCount && this.s.deskV === 2) this.s.employees.forEach(e => { e.desk = Math.floor(e.desk / 6) * 9 + (e.desk % 6); });   // skema meja v3 (9 per departemen)
     this.s.deskV = 3; if (!this.s.projects) this.s.projects = []; this.s.projects.forEach(p => { if (p.state === 'meeting') p.state = 'plan'; });
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
+    if (this.s.starterDone === undefined) this.s.starterDone = true;
     for (const k of ['approved', 'rejected', 'memos']) if (this.s.stat[k] === undefined) this.s.stat[k] = 0;
     if (!this.s.inbox) this.s.inbox = []; if (!this.s.memos) this.s.memos = []; if (this.s.coffeeStock === undefined) this.s.coffeeStock = 30; if (this.s.firstReq === undefined) this.s.firstReq = true;
     const d = { auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false };
@@ -663,6 +660,19 @@ export class Game {
   rename(id, name) {
     const e = this.emp(id); if (!e) return false;
     e.name = this.cleanName(name, e.name); this.addLog(`Karyawan diberi nama ${e.name}.`); this.emit('sfx', 'pop'); this.emit('change'); return true;
+  }
+  // ---------- Tim awal: pilih & beri nama staf untuk tiap bidang ----------
+  starterPool(dept, used = []) {
+    const sp = DEPTS[dept].specs, fem = [Math.random() < 0.4, Math.random() < 0.4, Math.random() < 0.4]; if (fem.every(Boolean)) fem[Math.floor(Math.random() * 3)] = false;
+    const specs = [sp[0], sp[1], sp[Math.random() < 0.5 ? 0 : 1]], out = [], names = [...used];
+    specs.forEach((spec, i) => { const x = Math.random(), rar = x < 0.5 ? 'N' : x < 0.9 ? 'R' : 'SR'; const c = makeEmployee(spec, rar, names, fem[i]); names.push(c.name); out.push(c); });
+    return out;
+  }
+  addStarter(c, name) {
+    const s = this.s, e = JSON.parse(JSON.stringify(c)); delete e.cost;
+    e.name = this.cleanName(name, c.name); e.desk = this.freeDesk(c.spec); if (e.desk < 0) return false;
+    e.mood = 88; e.energy = 92; s.employees.push(e); this.initEmpRuntime(e);
+    this.addLog(`${e.name} bergabung sebagai ${SPECS[e.spec].name}.`); this.emit('sfx', 'hire'); this.emit('change'); return true;
   }
   fireCost(e) { return r1(e.salary * 3); }
   fire(id) {

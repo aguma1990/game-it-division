@@ -30,7 +30,8 @@ function begin(opts) {
   else game.newGame({ name: opts.name, bank: opts.bank, dirLook: opts.dirLook });
   ui.startSession();
   game.s.speed = 1;
-  if (opts.mode === 'new') { game.s.speed = 0; hooks.save(); ui.showWelcome(); }
+  if (opts.mode === 'new') { game.s.speed = 0; ui.showStarterWizard(() => { hooks.save(); ui.showWelcome(); }); }
+  else if (!game.s.starterDone) { game.s.speed = 0; ui.showStarterWizard(() => { game.s.speed = 1; hooks.save(); }); }
   requestAnimationFrame(loop);
 }
 
