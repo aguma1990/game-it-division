@@ -1,5 +1,5 @@
 // Scene Canvas isometrik: kamera (geser/zoom), karyawan, Mochi, partikel, gelembung, hit-test.
-import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js';
+import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, DEPTS, deptOfSpec, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js';
 import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js';
 import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js';
 import * as I from './iso.js';
@@ -229,7 +229,7 @@ export class Scene {
     if (s.fac.play === 1) g.slots.play.forEach(id => { const e = id && g.emp(id); if (e && e.st === 'act') push(e.x + e.y + 0.5, ctx2 => I.ballsFront(ctx2, e.x, e.y, t)); });
     items.sort((a, b) => a.d - b.d); for (const it of items) it.fn(ctx);
     if (this.gift) this.drawGift(ctx, t);
-    this.drawTags(ctx, t);
+    this.drawTags(ctx, t); this.drawNames(ctx);
     for (const e of s.employees) this.drawBubbles(ctx, e, t);
     this.drawScold(ctx, t); this.drawDirBubble(ctx, t);
     this.drawParts(ctx, t);
@@ -255,6 +255,21 @@ export class Scene {
     this.hits.push({ type: 'boss', x0: px - 26, x1: px + 26, y0: py - 88, y1: py + 8, pri: 9 });
     const jx = mad ? Math.sin(t * 45) * 1.6 : 0;
     drawChibi(ctx, { x: px + jx, y: py, s: S, look: s.dirLook, spec: 'dir', pose: walking ? 'walk' : act ? act.pose : mad ? 'cheer' : talk ? 'wave' : writing ? 'type' : 'sit', t, face, dir: walking ? d.flip : 1, phase: 0.5 });
+  }
+  // label nama di bawah tiap karakter (tetap terbaca walau sedang berjalan)
+  nameTag(ctx, px, py, name, color) {
+    ctx.save(); ctx.font = font(800, 10); const w = ctx.measureText(name).width + 18;
+    rr(ctx, px - w / 2, py, w, 15, 7.5); ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(px - w / 2 + 8, py + 7.5, 3, 0, TAU); ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = '#1f3a2e'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(name, px + 4, py + 8); ctx.restore();
+  }
+  drawNames(ctx) {
+    const g = this.g, s = g.s, d = this.dir;
+    for (const e of s.employees) {
+      if (e.hidden) continue;
+      const [px, py] = P(e.x, e.y, this.seatLift(e)); this.nameTag(ctx, px, py + 9, e.name.split(' ')[0], DEPTS[deptOfSpec(e.spec)].color);
+    }
+    const [dx, dy] = d.walking ? P(d.x, d.y, 0) : P(18.7, 2.9, 18); this.nameTag(ctx, dx, dy + 9, `${s.name.split(' ')[0]} (Direktur)`, '#d6343c');
   }
   drawDirBubble(ctx, t) {
     const d = this.dir, a = d.act, sc = this.g.scold; if (!a || !a.text || (sc && sc.ready && sc.text)) return;

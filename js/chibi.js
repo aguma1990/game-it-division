@@ -15,12 +15,12 @@ export function shade(h, a) {
 
 const OUTFIT = {
   dir:  { main: '#1f2f5c', trim: '#d6343c', pants: '#1b2547', shoe: '#1c1c22' },
-  ctrl: { main: '#f2f4f8', trim: '#2f6fd0', pants: '#2a3350', shoe: '#1c1c22' },
-  dev:  { main: '#26282e', trim: '#4fb3ff', pants: '#2d3340', shoe: '#e8e8ee' },
-  ops:  { main: '#27427f', trim: '#ffd35a', pants: '#222a45', shoe: '#1c1c22' },
-  sec:  { main: '#232428', trim: '#3fc4b0', pants: '#202226', shoe: '#17171a' },
-  dba:  { main: '#f2f4f8', trim: '#2f6fd0', pants: '#2a3350', shoe: '#1c1c22' },
-  pm:   { main: '#f6f7fa', trim: '#7a5fd6', pants: '#2a3350', shoe: '#2b2b33' }
+  ctrl: { main: '#4a86e0', trim: '#2f6fd0', pants: '#2a3350', shoe: '#1c1c22' },
+  dev:  { main: '#8b66d8', trim: '#4fb3ff', pants: '#2d3340', shoe: '#e8e8ee' },
+  ops:  { main: '#f09a45', trim: '#ffd35a', pants: '#222a45', shoe: '#1c1c22' },
+  sec:  { main: '#2f62b8', trim: '#3fc4b0', pants: '#202226', shoe: '#17171a' },
+  dba:  { main: '#e07a2c', trim: '#2f6fd0', pants: '#2a3350', shoe: '#1c1c22' },
+  pm:   { main: '#a98ae8', trim: '#7a5fd6', pants: '#2a3350', shoe: '#2b2b33' }
 };
 
 function rr(ctx, x, y, w, h, r) {
