@@ -295,6 +295,12 @@ export function drawChibi(ctx, o) {
   const lh = arm(ctx, look, spec, -1, la);
   const rh = arm(ctx, look, spec, 1, ra);
   if (!held && !sit && (pose === 'stand' || pose === 'walk' || pose === 'wave')) heldProp(ctx, spec, look, t);
+  if (held === 'snack' && pose === 'drink') {
+    ctx.save(); ctx.translate(rh[0], rh[1] - 3);
+    ctx.beginPath(); ctx.arc(0, 0, 4.6, 0, Math.PI * 2); ctx.fillStyle = '#e2a65e'; ctx.fill(); ctx.strokeStyle = '#a8702f'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#6b3f1d'; for (const [x, y] of [[-1.6, -1.2], [1.5, 0.6], [-0.4, 1.8]]) { ctx.beginPath(); ctx.arc(x, y, 0.8, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
   if (held === 'cup' && pose === 'drink') {
     ctx.save(); ctx.translate(rh[0], rh[1] - 2);
     rr(ctx, -4, -4, 8, 8, 2.5); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#d4a574'; ctx.lineWidth = 1.2; ctx.stroke();

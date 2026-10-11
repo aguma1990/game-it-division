@@ -239,6 +239,7 @@ export class Scene {
       case 'act': {
         const k = e.act && e.act.kind;
         if (k === 'coffee') { pose = 'drink'; held = 'cup'; face = 'happy'; }
+        else if (k === 'snack') { pose = 'drink'; held = 'snack'; face = 'happy'; }
         else if (k === 'ps') { pose = 'game'; held = 'pad'; face = 'excited'; }
         else if (k === 'play') { pose = s.fac.play === 1 ? 'ball' : 'bounce'; face = 'happy'; }
         else if (k === 'nap') { pose = 'sleep'; face = 'sleep'; }
@@ -328,7 +329,8 @@ export class Scene {
     };
     if (s.fac.coffee && s.coffeeStock <= 0) { const [cx, cy] = P(2.0, 0.6, 118); I.tag(ctx, cx, cy, '☕ Stok habis! → Inbox', t, '#e5484d'); this.hits.push({ type: 'room', kind: 'inbox', x0: cx - 70, x1: cx + 70, y0: cy - 16, y1: cy + 20, pri: 7 }); }
     tagFor('pool', 24.0, 4.2, 70);
-    tagFor('coffee', 2.0, 0.6, 108); tagFor('ps', 12.0, 0.2, 140); tagFor('play', 13.4, 12.4, 40);
+    tagFor('coffee', 2.0, 0.6, 108); tagFor('snack', 0.65, 1.95, 104);
+    if (s.fac.snack && s.snackStock <= 0) { const [cx, cy] = P(0.65, 1.95, 124); I.tag(ctx, cx, cy, '🍪 Snack habis! → Inbox', t, '#e5484d'); this.hits.push({ type: 'room', kind: 'inbox', x0: cx - 70, x1: cx + 70, y0: cy - 16, y1: cy + 20, pri: 7 }); } tagFor('ps', 12.0, 0.2, 140); tagFor('play', 13.4, 12.4, 40);
     DEPT_KEYS.forEach(d => {
       const n = s.deskCount[d]; if (n >= DESK_MAX || !g.deptFull(d)) return;
       const sp = I.expandSpot(g, d), [x, y] = P(sp.x, sp.y, 62), txt = `🏗️ +Meja Rp ${DESK_COSTS[g.totalDesks()]} jt`;

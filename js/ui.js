@@ -88,8 +88,8 @@ export class UI {
     const g = this.g;
     switch (e.st) {
       case 'sick': return '😵 Burnout — sedang pulih';
-      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
-      case 'act': return ({ coffee: '☕ Sedang ngopi', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
+      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
+      case 'act': return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
       case 'queue': return '⏳ Antri fasilitas';
       case 'walk': return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
       case 'work': { const t = g.task(e.task); return `💼 ${t ? t.title : 'Bekerja'}`; }
@@ -150,8 +150,8 @@ export class UI {
   // ----- Tab Inbox (persetujuan & memo) -----
   inboxView() {
     const g = this.g, s = g.s;
-    const sig = 'B' + this.focus + s.day + '|' + s.inbox.map(r => r.id + r.opts.map(o => (s.money >= o.cost ? 1 : 0)).join('')).join(',') + '|' + s.memos.length + '|' + s.coffeeStock + '|' + (s.projects || []).map(p => p.id + p.state).join(',');
-    let html = `<div class="t-sub" style="margin:2px 4px 8px;font-weight:700">Karyawan, Direksi, dan klien mengajukan permintaan. Kamu yang memutuskan — ada yang butuh <b>memo resmi</b> ✍️. Stok kopi: <b>☕ ${s.coffeeStock}</b> cangkir.</div>`;
+    const sig = 'B' + this.focus + s.day + '|' + s.inbox.map(r => r.id + r.opts.map(o => (s.money >= o.cost ? 1 : 0)).join('')).join(',') + '|' + s.memos.length + '|' + s.coffeeStock + '|' + s.snackStock + '|' + (s.projects || []).map(p => p.id + p.state).join(',');
+    let html = `<div class="t-sub" style="margin:2px 4px 8px;font-weight:700">Karyawan, Direksi, dan klien mengajukan permintaan. Kamu yang memutuskan — ada yang butuh <b>memo resmi</b> ✍️. Stok kopi: <b>☕ ${s.coffeeStock}</b> · snack: <b>🍪 ${s.snackStock}</b>.</div>`;
     if (!s.inbox.length) html += `<div class="empty"><span class="big">📭</span>Tidak ada permintaan menunggu.<br>Bagus! Permintaan baru muncul tiap hari.</div>`;
     for (const r of s.inbox) {
       const e = r.from ? g.emp(r.from) : null, left = r.deadline - s.day;
@@ -202,13 +202,13 @@ export class UI {
         <div class="mini"><span>😣</span>${this.bar('st', 'st:' + e.id, e.stress)}</div>
         <div class="mini"><span>💚</span>${this.bar('mo', 'mo:' + e.id, e.mood)}</div></div>
       <div class="t-sub" style="margin-top:6px;font-weight:800" data-status="${e.id}">${esc(this.statusText(e))}</div>
-      <div class="acts">${btn('coffee', '☕', 'Ngopi')}${btn('ps', '🎮', 'Main PS')}${btn('play', '🛝', 'Bermain')}${btn('pool', '🏊', 'Berenang')}${btn('nap', '😴', 'Tidur')}
+      <div class="acts">${btn('coffee', '☕', 'Ngopi')}${btn('snack', '🍪', 'Ngemil')}${btn('ps', '🎮', 'Main PS')}${btn('play', '🛝', 'Bermain')}${btn('pool', '🏊', 'Berenang')}${btn('nap', '😴', 'Tidur')}
         <button class="btn mint" data-act="bonus" data-id="${e.id}" ${s.money < 1 ? 'disabled' : ''} title="Bonus Rp 1 jt">🎁</button>
         <button class="btn ghost" data-act="rename" data-id="${e.id}" title="Ganti nama">✏️</button><button class="btn lav" data-act="summon" data-id="${e.id}" title="Panggil ke ruangan" ${e.st === 'sick' ? 'disabled' : ''}>📢</button><button class="btn ghost" data-act="fire" data-id="${e.id}" title="Pecat" style="color:#d6334f">🚪</button><button class="btn gold" data-act="train" data-id="${e.id}" ${s.money < tc || e.skill >= 99 ? 'disabled' : ''} title="Kursus">📚 <small>${fmtMoney(tc).replace('Rp ', '')}</small></button></div></div>`;
   }
   teamView() {
     const g = this.g, s = g.s, crew = s.employees.filter(e => !e.leaving);
-    const sig = 'M' + this.focus + crew.map(e => e.id + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
+    const sig = 'M' + this.focus + crew.map(e => e.id + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.snack ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
     let html = `<div class="sec-title"><span>Tim kamu (${crew.length}/${g.totalDesks()} meja)</span></div>`;
     if (!crew.length) html += `<div class="empty"><span class="big">🪑</span>Belum ada karyawan.</div>`;
     html += crew.map(e => this.empCard(e)).join('');
@@ -287,7 +287,7 @@ export class UI {
       case 'assign': sfx('tap'); this.showAssign(id); return;
       case 'unassign': g.unassign(id); sfx('tap'); break;
       case 'claim': g.claimTask(id, true); break;
-      case 'brk': { const em = g.emp(id); if (em && g.requestActivity(em, k, true)) { sfx('pop'); g.toast(`${em.name}: ${({ coffee: 'ngopi ☕', ps: 'main PS 🎮', play: 'main di taman 🛝', pool: 'berenang 🏊', nap: 'tidur sebentar 😴' })[k]}`, 'info'); } break; }
+      case 'brk': { const em = g.emp(id); if (em && g.requestActivity(em, k, true)) { sfx('pop'); g.toast(`${em.name}: ${({ coffee: 'ngopi ☕', snack: 'ngemil 🍪', ps: 'main PS 🎮', play: 'main di taman 🛝', pool: 'berenang 🏊', nap: 'tidur sebentar 😴' })[k]}`, 'info'); } break; }
       case 'bonus': g.giveBonus(id); break;
       case 'train': g.train(id); break;
       case 'hire': sfx('tap'); this.showNameDialog(id, false); return;

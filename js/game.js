@@ -27,7 +27,7 @@ export const SERVER_ST = [{ x: 7.9, y: 11.7 }, { x: 9.25, y: 11.7 }, { x: 10.6, 
 export const PLAY_SLOTS = [[12.4, 11.6], [14.0, 11.6], [12.4, 13.0], [14.0, 13.0]];
 export const ENTRY = { x: 15.5, y: C1_Y };
 const HOURS_PER_SEC = 1 / 4.2;   // 4,2 detik nyata = 1 jam game (1x) → 1 hari ≈ 38 detik
-const ACT_DUR = { coffee: 3.6, ps: 10, play: 8, pool: 9, summon: 9 };
+const ACT_DUR = { coffee: 3.6, snack: 4.2, ps: 10, play: 8, pool: 9, summon: 9 };
 export const SCOLD_SPOT = { x: 19.3, y: 4.7 };
 const SCOLD_LINES = {
   marah: ['KERJAAN KOK BEGINI?! 😡', 'Berapa kali saya bilang?!', 'Deadline itu bukan saran!', 'Saya kecewa sama kamu!!', 'Mau jadi apa divisi ini?!', 'Kopi terus, kerja kapan?!'],
@@ -43,6 +43,7 @@ export const deskPos = i => { const p = deskXY(i); return { x: p.x + 0.85, y: p.
 export function spotFor(kind, idx, n) {
   switch (kind) {
     case 'coffee': return { x: 3.0 + idx * 1.0, y: 2.0, pose: 'drink' };
+    case 'snack': return { x: 0.6 + idx * 0.9, y: 2.9, pose: 'drink' };
     case 'ps': return { x: 11.8 + (idx - (n - 1) / 2) * 1.0, y: 1.0, pose: 'game' };
     case 'play': return { x: PLAY_SLOTS[idx][0], y: PLAY_SLOTS[idx][1], pose: 'bounce' };
     case 'server': return { x: SERVER_ST[idx].x, y: SERVER_ST[idx].y, pose: 'type' };
@@ -53,6 +54,7 @@ export function spotFor(kind, idx, n) {
 }
 export const queueSpot = (kind, qi) => ({
   coffee: [{ x: 5.9, y: 2.8 }, { x: 5.3, y: 3.4 }, { x: 4.4, y: 3.3 }],
+  snack: [{ x: 1.0, y: 3.7 }, { x: 2.0, y: 3.7 }, { x: 0.4, y: 3.7 }],
   ps: [{ x: 8.6, y: 2.0 }, { x: 8.2, y: 2.6 }, { x: 9.0, y: 2.8 }],
   play: [{ x: 11.8, y: 9.7 }, { x: 12.8, y: 9.7 }, { x: 13.8, y: 9.7 }],
   pool: [{ x: 22.2, y: 8.6 }, { x: 23.4, y: 8.8 }, { x: 24.6, y: 8.6 }]
@@ -116,9 +118,9 @@ export class Game {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], fac: { coffee: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], fac: { coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
-      week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
+      week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
     };
     this.initRuntime();
     for (let i = 0; i < 3; i++) this.spawnTask(['dev', 'ops', 'ctrl'][i], 'mid');
@@ -144,7 +146,7 @@ export class Game {
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
     if (this.s.starterDone === undefined) this.s.starterDone = true;
     for (const k of ['approved', 'rejected', 'memos']) if (this.s.stat[k] === undefined) this.s.stat[k] = 0;
-    if (!this.s.inbox) this.s.inbox = []; if (!this.s.memos) this.s.memos = []; if (this.s.coffeeStock === undefined) this.s.coffeeStock = 30; if (this.s.firstReq === undefined) this.s.firstReq = true;
+    if (!this.s.inbox) this.s.inbox = []; if (!this.s.memos) this.s.memos = []; if (this.s.coffeeStock === undefined) this.s.coffeeStock = 30; if (this.s.snackStock === undefined) this.s.snackStock = 24; if (this.s.fac.snack === undefined) this.s.fac.snack = 0; if (this.s.firstReq === undefined) this.s.firstReq = true;
     const d = { auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false };
     for (const k in d) if (this.s[k] === undefined) this.s[k] = d[k];
     this.initRuntime();
@@ -156,8 +158,8 @@ export class Game {
   }
 
   initRuntime() {
-    this.slots = { coffee: [], ps: [], play: [], pool: [], server: [], meeting: [] };
-    this.queue = { coffee: [], ps: [], play: [], pool: [] };
+    this.slots = { coffee: [], snack: [], ps: [], play: [], pool: [], server: [], meeting: [] };
+    this.queue = { coffee: [], snack: [], ps: [], play: [], pool: [] };
     this.resizeSlots();
     this.s.employees.forEach(e => this.initEmpRuntime(e));
     this.scold = null; this.autoT = 0; this.mochiLast = 0; this.pending = null; this.report = null;
@@ -171,7 +173,7 @@ export class Game {
   }
 
   resizeSlots() {
-    for (const k of ['coffee', 'ps', 'play', 'pool', 'server', 'meeting']) {
+    for (const k of ['coffee', 'snack', 'ps', 'play', 'pool', 'server', 'meeting']) {
       const n = this.capacity(k), a = this.slots[k];
       while (a.length < n) a.push(null);
     }
@@ -344,6 +346,7 @@ export class Game {
     }
     if (!this.s.fac[kind]) { if (forced) this.toast('Belum punya fasilitas itu — beli di Toko ya! 🛍️', 'warn'); return false; }
     if (kind === 'coffee' && this.s.coffeeStock <= 0) { if (forced || Math.random() < 0.2) this.toast('☕ Biji kopi habis! Setujui pembelian stok di Inbox.', 'warn'); return false; }
+    if (kind === 'snack' && this.s.snackStock <= 0) { if (forced || Math.random() < 0.2) this.toast('🍪 Snack habis! Setujui pembelian stok di Inbox.', 'warn'); return false; }
     this.cancelActivity(e); this.releaseWork(e);
     const n = this.capacity(kind), idx = this.slots[kind].indexOf(null);
     if (idx >= 0) {
@@ -363,7 +366,7 @@ export class Game {
   }
 
   promoteQueues() {
-    for (const kind of ['coffee', 'ps', 'play', 'pool']) {
+    for (const kind of ['coffee', 'snack', 'ps', 'play', 'pool']) {
       const q = this.queue[kind];
       while (q.length) {
         const idx = this.slots[kind].indexOf(null); if (idx < 0) break;
@@ -395,6 +398,13 @@ export class Game {
       e.energy = clamp(e.energy + (l ? l.energy : 30) * k); e.buff = 28; e.stress = clamp(e.stress + 2.5); e.mood = clamp(e.mood + (e.trait === 'kopi' ? 9 : 3));
       s.stat.cups++; s.coffeeStock = Math.max(0, s.coffeeStock - 1); if (s.coffeeStock <= 5 && s.fac.coffee && !s.inbox.some(r => r.type === 'coffee')) this.genRequest('coffee'); this.say(e, pick(['Segar! ☕', 'Nyess~', 'Energi penuh!']), 2.5); this.face(e, 'happy', 3);
       this.emit('popup', { empId: e.id, text: '⚡ Energi!', kind: 'energy' });
+    } else if (a.kind === 'snack') {
+      const l = this.facInfo('snack'), k = e.trait === 'kopi' || e.trait === 'ceria' ? 1.3 : 1;
+      e.energy = clamp(e.energy + (l ? l.energy : 10) * k); e.mood = clamp(e.mood + (l ? l.mood : 6) * k); e.stress = clamp(e.stress - 6);
+      s.stat.snacks = (s.stat.snacks || 0) + 1; s.snackStock = Math.max(0, s.snackStock - 1);
+      if (s.snackStock <= 4 && s.fac.snack && !s.inbox.some(r => r.type === 'snack')) this.genRequest('snack');
+      this.say(e, pick(['Nyam nyam! 🍪', 'Enak~', 'Kulkasnya top!', 'Isi tenaga 🍫']), 2.5); this.face(e, 'happy', 3);
+      this.emit('popup', { empId: e.id, text: '🍪 Yummy!', kind: 'energy' });
     } else if (a.kind === 'ps') { s.stat.psPlays++; this.say(e, pick(['Seru banget!', 'Menang! 🏆', 'Stres hilang~'])); this.face(e, 'happy', 3); }
     else if (a.kind === 'pool') { s.stat.poolSwims = (s.stat.poolSwims || 0) + 1; this.say(e, pick(['Segarnya! 💦', 'Byurr~ 🏊', 'Stres larut di air…'])); this.face(e, 'happy', 3); }
     else if (a.kind === 'play') { s.stat.playPlays++; this.say(e, pick(['Hepi hepi! 🌈', 'Capek tapi senang~'])); this.face(e, 'happy', 3); }
@@ -487,6 +497,7 @@ export class Game {
     const s = this.s; if (!s.autoBreak || e.cool > 0) return;
     let kind = null;
     if (e.energy < 28) kind = s.fac.coffee ? 'coffee' : (e.energy < 15 ? 'nap' : null);
+    if (!kind && s.fac.snack && s.snackStock > 0 && (e.energy < 50 || e.mood < 60) && Math.random() < 0.5) kind = 'snack';
     if (!kind && e.stress > 66) kind = this.bestFun(e);
     if (!kind && e.mood < 52) kind = this.bestFun(e);
     if (!kind) return;
@@ -780,12 +791,13 @@ export class Game {
   genRequest(kind) {
     const s = this.s, emps = s.employees; if (!emps.length) return;
     const kinds = [['repair', 3, () => emps.some(e => !e.broken)], ['leave', 2, () => emps.length >= 2], ['training', 2, () => emps.some(e => e.skill < 95)],
-      ['memo', 2, () => s.day >= 3 && !s.inbox.some(r => r.type === 'memo')], ['project', 2.5, () => s.day >= 4 && !s.inbox.some(r => r.type === 'project')], ['coffee', 0, () => false]];
+      ['memo', 2, () => s.day >= 3 && !s.inbox.some(r => r.type === 'memo')], ['project', 2.5, () => s.day >= 4 && !s.inbox.some(r => r.type === 'project')], ['coffee', 0, () => false], ['snack', 0, () => false]];
     if (!kind) { const pool = kinds.filter(k => k[2]()); let x = Math.random() * pool.reduce((a, k) => a + k[1], 0); kind = pool[0][0]; for (const k of pool) { x -= k[1]; if (x <= 0) { kind = k[0]; break; } } }
     const e = pick(emps.filter(x => kind === 'repair' ? !x.broken : true)) || pick(emps);
     switch (kind) {
       case 'repair': e.broken = true; return this.addRequest({ type: 'repair', icon: '🔧', from: e.id, title: `Laptop ${e.name.split(' ')[0]} rusak`, body: `"Bos, laptop saya mati total dan kerjaan jadi lambat. Boleh diperbaiki atau diganti baru?"`, opts: [{ k: 'fix', label: 'Perbaiki', cost: r1(rnd(1.8, 3)) }, { k: 'new', label: 'Beli baru', cost: r1(rnd(6, 8)) }], ttl: 3 });
       case 'coffee': return this.addRequest({ type: 'coffee', icon: '☕', from: (emps.find(x => x.trait === 'kopi') || e).id, title: 'Stok biji kopi hampir habis', body: '"Mesin kopi tinggal beberapa cangkir lagi… tolong setujui pembelian biji kopi ya!"', opts: [{ k: 'buy', label: 'Beli stok', cost: 3 }, { k: 'premium', label: 'Biji premium', cost: 6 }], ttl: 3 });
+      case 'snack': return this.addRequest({ type: 'snack', icon: '🍪', from: e.id, title: 'Stok snack hampir habis', body: '"Kulkas hampir kosong, Bos… boleh belanja cemilan lagi?"', opts: [{ k: 'buy', label: 'Belanja snack', cost: 2.5 }, { k: 'premium', label: 'Paket spesial', cost: 5 }], ttl: 3 });
       case 'leave': return this.addRequest({ type: 'leave', icon: '🏖️', from: e.id, title: `${e.name.split(' ')[0]} mengajukan cuti`, body: '"Boleh cuti sehari? Badan rasanya capek banget…" ', opts: [{ k: 'ok', label: 'Setujui cuti', cost: 0 }], ttl: 2 });
       case 'training': { const c = this.trainCost(e); return this.addRequest({ type: 'training', icon: '📚', from: e.id, title: `${e.name.split(' ')[0]} minta ikut pelatihan`, body: '"Ada kursus bagus untuk naik skill. Boleh ikut, Bos?"', opts: [{ k: 'ok', label: 'Setujui', cost: c }], ttl: 3 }); }
       case 'memo': return this.addRequest({ type: 'memo', icon: '📝', from: null, sender: 'Direksi', title: 'Direksi minta memo progres', body: 'Direksi meminta memo singkat tentang kondisi divisi TI minggu ini. Tulis memo untuk mereka.', memo: true, opts: [{ k: 'send', label: 'Buat memo', cost: 0 }], ttl: 2 });
@@ -820,6 +832,7 @@ export class Game {
     switch (r.type) {
       case 'repair': if (e) { e.broken = false; if (opt.k === 'new') e.deviceBonus = 1.12; e.mood = clamp(e.mood + 8); this.say(e, opt.k === 'new' ? 'Laptop baru! Kencang! 💻✨' : 'Sudah normal lagi! 🔧', 3); this.face(e, 'happy', 3); } break;
       case 'coffee': s.coffeeStock += opt.k === 'premium' ? 45 : 40; if (opt.k === 'premium') s.employees.forEach(x => { x.mood = clamp(x.mood + 3); }); this.toast(`☕ Stok kopi terisi (${s.coffeeStock} cangkir)`, 'good'); break;
+      case 'snack': s.snackStock += opt.k === 'premium' ? 40 : 30; if (opt.k === 'premium') s.employees.forEach(x => { x.mood = clamp(x.mood + 3); }); this.toast(`🍪 Stok snack terisi (${s.snackStock} porsi)`, 'good'); break;
       case 'leave': if (e) { this.cancelActivity(e); this.releaseWork(e); const t = e.task && this.task(e.task); if (t) { t.state = 'new'; t.emp = null; e.task = null; } e.st = 'sick'; e.sickT = 18; e.stress = clamp(e.stress - 30); e.mood = clamp(e.mood + 18); const d = this.goDeskPos(e); e.x = d.x; e.y = d.y; e.step = null; e.path = []; this.say(e, 'Makasih, Bos! Cuti dulu 🏖️', 4); } break;
       case 'training': if (e) { e.skill = Math.min(99, e.skill + 3); e.xp += 30; e.mood = clamp(e.mood + 6); this.say(e, 'Ilmu baru! 📚', 3); this.emit('fx', { kind: 'stars', x: e.x, y: e.y }); } break;
       case 'memo': this.addMoney(3); this.boost('service', 2); this.cut('risk', 2); this.addXp(25); this.toast('📝 Memo diterima Direksi: bonus Rp 3 jt & layanan naik', 'good'); break;
@@ -970,7 +983,7 @@ export class Game {
     switch (m.key) {
       case 'assigned': return st.assigned; case 'tasksDone': return st.tasksDone; case 'cups': return st.cups; case 'hired': return st.hired;
       case 'psPlays': return st.psPlays; case 'mochi': return st.mochi; case 'perfect': return st.perfect; case 'mgWins': return st.mgWins;
-      case 'facCoffee': return s.fac.coffee; case 'facPs': return s.fac.ps; case 'facPlay': return s.fac.play;
+      case 'facCoffee': return s.fac.coffee; case 'facSnack': return s.fac.snack; case 'facPs': return s.fac.ps; case 'facPlay': return s.fac.play;
       case 'approved': return st.approved; case 'memos': return st.memos;
       case 'facPool': return s.fac.pool || 0; case 'scolds': return st.scolds || 0; case 'projects': return st.projects || 0;
       case 'level': return s.level; case 'team': return s.employees.length; case 'stars': return this.stars(); case 'day': return s.day;

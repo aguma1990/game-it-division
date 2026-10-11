@@ -88,6 +88,13 @@ export const FACILITIES = {
       { name: 'Robot Barista Neko', cost: 42, lvl: 6, slots: 3, energy: 55, desc: 'Latte art kucing + energi maksimal. 3 slot.' }
     ]
   },
+  snack: {
+    name: 'Kulkas & Snack', emoji: '🧊', room: 'Pantry',
+    levels: [
+      { name: 'Kulkas Mini', cost: 10, lvl: 2, slots: 2, mood: 6, energy: 10, desc: 'Minuman dingin & cemilan. 2 orang sekali ambil.' },
+      { name: 'Kulkas + Rak Snack', cost: 22, lvl: 4, slots: 3, mood: 9, energy: 15, desc: 'Keripik, cokelat, dan mochi! 3 slot.' }
+    ]
+  },
   ps: {
     name: 'Konsol PS', emoji: '🎮', room: 'Ruang Gim',
     levels: [
@@ -154,6 +161,7 @@ export const MISSIONS = [
   { id: 'm_coffee', title: 'Beli Mesin Kopi', desc: 'Kafein = bahan bakar para engineer.', need: 1, key: 'facCoffee', money: 4, xp: 40 },
   { id: 'm_cups', title: 'Seruput 10 cangkir kopi', desc: 'Biarkan tim ngopi di pantry.', need: 10, key: 'cups', money: 4, xp: 50 },
   { id: 'm_hire', title: 'Rekrut teman baru', desc: 'Beli meja kalau penuh, lalu rekrut di tab Tim.', need: 1, key: 'hired', money: 5, xp: 50 },
+  { id: 'm_snack', title: 'Beli Kulkas & Snack', desc: 'Perut kenyang, hati senang.', need: 1, key: 'facSnack', money: 4, xp: 40 },
   { id: 'm_ps', title: 'Beli Konsol PS', desc: 'Istirahat main game itu produktif (katanya).', need: 1, key: 'facPs', money: 6, xp: 60 },
   { id: 'm_mochi', title: 'Elus Mochi 10 kali', desc: 'Tap kucing putih yang keliling kantor.', need: 10, key: 'mochi', money: 3, xp: 40 },
   { id: 'm_psplay', title: 'Sesi main PS ×5', desc: 'Stres turun, mood naik.', need: 5, key: 'psPlays', money: 5, xp: 60 },

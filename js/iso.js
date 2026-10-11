@@ -391,7 +391,22 @@ export function collectProps(g, t, hour, using, push) {
     for (let k = 0; k < 5; k++) { const a = P(0.95 + k * 0.9, 1.06, 5), b = P(1.65 + k * 0.9, 1.06, 5), c2 = P(1.65 + k * 0.9, 1.06, 28), d2 = P(0.95 + k * 0.9, 1.06, 28); poly(ctx, [a, b, c2, d2], null, 'rgba(90,70,30,0.35)', 1); const kn = P(1.3 + k * 0.9, 1.06, 24); ctx.fillStyle = '#3fa56f'; ctx.beginPath(); ctx.arc(kn[0], kn[1], 2, 0, TAU); ctx.fill(); }
     [[4.0, '#8fd3ab'], [4.35, '#ffe9a8'], [4.7, '#cfe6ff']].forEach(([gx2, c2]) => box(ctx, gx2, 0.45, 0.2, 0.2, 9, c2, 36));
   });
-  push(0.2 + 1.5, ctx => box(ctx, 0.2, 1.5, 0.9, 0.9, 78, '#e3ece8', 0, { top: '#f6fbf8' }));
+  push(0.2 + 1.5, ctx => {
+    const fl = s.fac.snack;
+    if (!fl) { box(ctx, 0.2, 1.5, 0.9, 0.9, 78, '#e3ece8', 0, { top: '#f6fbf8' }); return; }
+    box(ctx, 0.2, 1.5, 0.9, 0.9, fl > 1 ? 92 : 78, '#f4f8f6', 0, { top: '#ffffff' });
+    const a = P(0.2, 2.4, fl > 1 ? 88 : 74), b = P(1.1, 2.4, fl > 1 ? 88 : 74), c2 = P(1.1, 2.4, 4), d2 = P(0.2, 2.4, 4);
+    poly(ctx, [a, b, c2, d2], null, '#9ec9b2', 1.5);
+    const mid = P(0.2, 2.4, fl > 1 ? 52 : 44), mid2 = P(1.1, 2.4, fl > 1 ? 52 : 44); ctx.strokeStyle = '#9ec9b2'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(...mid); ctx.lineTo(...mid2); ctx.stroke();
+    const h1 = P(0.95, 2.4, fl > 1 ? 70 : 60), h2 = P(0.95, 2.4, fl > 1 ? 58 : 50); ctx.strokeStyle = '#3fa56f'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(...h1); ctx.lineTo(...h2); ctx.stroke();
+    [['#ff9fb0', 0.35, 60], ['#ffd84d', 0.6, 62], ['#8fd3ff', 0.8, 58]].forEach(([cc, gx2, z]) => { const p = P(gx2, 2.4, z), p2 = P(gx2 + 0.12, 2.4, z); ctx.fillStyle = cc; rr(ctx, p[0] - 3, p[1] - 3, 7, 6, 2); ctx.fill(); });
+    if (fl > 1) push2(ctx);
+    function push2(c) { const [x, y] = P(0.65, 1.95, 98); c.fillStyle = '#ffd84d'; ell(c, x - 6, y, 6, 4); c.fill(); c.fillStyle = '#ff9fb0'; ell(c, x + 5, y - 2, 6, 4); c.fill(); c.fillStyle = '#8fd3ab'; ell(c, x, y - 5, 6, 4); c.fill(); }
+  });
+  if (s.fac.snack > 1) push(1.5 + 1.8, ctx => {   // rak snack
+    box(ctx, 1.4, 1.5, 0.7, 0.5, 58, '#e8c88f', 0, { top: '#f6dcaa' });
+    [['#ff7a59', 0], ['#ffd84d', 1], ['#7fd6a0', 2]].forEach(([cc, r]) => { for (let k = 0; k < 3; k++) { const p = P(1.55 + k * 0.2, 2.0, 12 + r * 16); ctx.fillStyle = cc; rr(ctx, p[0] - 4, p[1] - 5, 8, 9, 2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke(); } });
+  });
   push(0.2, ctx => { box(ctx, 5.5, 0.25, 0.55, 0.55, 56, '#bfe6f2', 0, { top: '#e1f5fb' }); const [x, y] = P(5.78, 0.8, 38); ctx.fillStyle = '#4a93e0'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, TAU); ctx.fill(); });
   const cl = s.fac.coffee;
   push(-0.5, ctx => {   // mesin kopi di atas counter
