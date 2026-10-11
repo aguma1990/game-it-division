@@ -1,9 +1,9 @@
 // Data statis game: spesialisasi, sifat, template tiket, fasilitas, misi.
 
 // Dunia isometrik: grid 16 x 15 petak, petak 64x32 px
-export const GW = 21, GH = 15, TW = 64, TH = 32;
-export const OX = 504, OY = 172;            // posisi piksel petak (0,0)
-export const WORLD_W = 1210, WORLD_H = 712;
+export const GW = 28, GH = 22, TW = 64, TH = 32;
+export const OX = 933, OY = 172;            // posisi piksel petak (0,0)
+export const WORLD_W = 2020, WORLD_H = 1190;
 
 export const SPECS = {
   dev:  { name: 'Developer',        dept: 'Pengembangan Sistem',         emoji: '💻', color: '#8f8cf2', dark: '#6a67d6' },
@@ -104,6 +104,14 @@ export const FACILITIES = {
       { name: 'Istana Pelangi', cost: 64, lvl: 7, slots: 4, rate: 1.9, desc: 'Istana bantal dengan pelangi sungguhan!' }
     ]
   },
+  pool: {
+    name: 'Kolam Renang', emoji: '🏊', room: 'Area Kolam',
+    levels: [
+      { name: 'Kolam Mini', cost: 28, lvl: 5, slots: 2, rate: 1.2, desc: 'Berendam santai! Stres turun cepat & mood naik.' },
+      { name: 'Kolam + Gazebo', cost: 55, lvl: 8, slots: 3, rate: 1.6, desc: 'Kolam lebih besar dengan kursi santai & payung.' },
+      { name: 'Resort Pool + Perosotan Air', cost: 95, lvl: 11, slots: 4, rate: 2.1, desc: 'Kolam resor mewah, 4 perenang sekaligus!' }
+    ]
+  },
   server: {
     name: 'Ruang Server', emoji: '🖥️', room: 'Ruang Server',
     levels: [
@@ -123,9 +131,9 @@ export const DEPTS = {
 };
 export const DEPT_KEYS = ['ctrl', 'dev', 'ops'];
 export const deptOfSpec = sp => DEPT_KEYS.find(k => DEPTS[k].specs.includes(sp));
-export const DESK_MAX = 3;
-export const DESK_COSTS = [0, 0, 0, 10, 16, 24, 30, 38, 46];   // biaya meja berdasarkan jumlah meja total
-export const DESK_LEVELS = [1, 1, 1, 2, 3, 4, 5, 6, 7];
+export const DESK_MAX = 9;                    // 3 meja/baris: 2 baris di gedung utama + 1 baris di Gedung Tambahan
+export const DESK_COSTS = [0, 0, 0, 10, 16, 24, 30, 38, 46, 54, 62, 72, 82, 92, 104, 116, 128, 140, 152, 166, 180, 196, 212, 228, 246, 264, 282];   // biaya meja berdasarkan jumlah meja total
+export const DESK_LEVELS = [1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14, 15, 15];
 
 export const DECOR = {
   plant:   { name: 'Monstera Imut',      emoji: '🪴', cost: 4,  lvl: 1, mood: 1, desc: 'Tanaman bikin mata adem. Mood +' },
@@ -149,6 +157,10 @@ export const MISSIONS = [
   { id: 'm_ps', title: 'Beli Konsol PS', desc: 'Istirahat main game itu produktif (katanya).', need: 1, key: 'facPs', money: 6, xp: 60 },
   { id: 'm_mochi', title: 'Elus Mochi 10 kali', desc: 'Tap kucing putih yang keliling kantor.', need: 10, key: 'mochi', money: 3, xp: 40 },
   { id: 'm_psplay', title: 'Sesi main PS ×5', desc: 'Stres turun, mood naik.', need: 5, key: 'psPlays', money: 5, xp: 60 },
+  { id: 'm_pool', title: 'Buka Kolam Renang', desc: 'Tim butuh berendam setelah lembur!', need: 1, key: 'facPool', money: 12, xp: 110 },
+  { id: 'm_proj1', title: 'Go-Live proyek pertama', desc: 'Setujui proyek, rapat kick-off, lalu luncurkan!', need: 1, key: 'projects', money: 15, xp: 140 },
+  { id: 'm_proj3', title: 'Luncurkan 3 proyek', desc: 'Divisi TI jadi andalan Direksi.', need: 3, key: 'projects', money: 40, xp: 260 },
+  { id: 'm_scold', title: 'Bos Galak: marahi staf 3 kali', desc: 'Panggil staff ke ruangan lewat tab Tim (hati-hati, mereka bisa resign!).', need: 3, key: 'scolds', money: 6, xp: 60 },
   { id: 'm_play', title: 'Buka Taman Bermain', desc: 'Kolam bola warna-warni menunggu!', need: 1, key: 'facPlay', money: 7, xp: 70 },
   { id: 'm_done10', title: 'Selesaikan 10 tiket', desc: 'Mulai jadi tim andalan bank.', need: 10, key: 'tasksDone', money: 8, xp: 90 },
   { id: 'm_lv5', title: 'Capai Level 5', desc: 'Jadi Kepala Bagian!', need: 5, key: 'level', money: 15, xp: 0 },

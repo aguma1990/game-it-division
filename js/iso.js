@@ -1,16 +1,23 @@
 // Penggambar dunia isometrik (kantor tampak dari atas): lantai, dinding, sekat kaca, furnitur, zona.
 import { TW, TH, OX, OY, SPECS, DEPTS, DEPT_KEYS } from './data.js';
 import { rr, ell, star4, shade } from './chibi.js';
-import { deskXY, SERVER_ST, PLAY_SLOTS, V_X } from './game.js';
+import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS } from './game.js';
 
 const TAU = Math.PI * 2;
 export const FONT = 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Nunito", system-ui, sans-serif';
 export const font = (w, s) => `${w} ${s}px ${FONT}`;
 export const WH = 132;                                   // tinggi dinding
-export const GWD = 21, GHT = 15;
+export const GWD = 28, GHT = 22;
 const lerp = (a, b, t) => a + (b - a) * t;
-export const P = (gx, gy, z = 0) => [OX + (gx - gy) * TW / 2, OY + (gx + gy) * TH / 2 - z];
-export const unP = (sx, sy) => { const a = (sx - OX) / (TW / 2), b = (sy - OY) / (TH / 2); return { gx: (a + b) / 2, gy: (b - a) / 2 }; };
+// Jarak antar bagian dilebarkan: koordinat logis (grid) diregangkan di celah-celah tertentu saat digambar.
+// Wilayah [a, b, tambahan]: ruang antara a..b melebar sebesar 'tambahan' petak (tidak ada objek yang memotongnya).
+const STX = [[6, 7, 3.0], [15.6, 16, 2.0]];                         // lorong tegak tengah; celah menuju sayap timur
+const STY = [[5, 5.5, 2.0], [10, 10.4, 2.4], [15, 15.6, 2.0]];     // area belakang↔ruang kerja; ruang kerja↔server/ops; ↔Gedung Tambahan
+const stretch = (v, regs) => v + regs.reduce((s, [a, b, e]) => s + e * Math.min(1, Math.max(0, (v - a) / (b - a))), 0);
+const unstretch = (w, regs) => { let lo = -5, hi = 45; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (stretch(mid, regs) < w) lo = mid; else hi = mid; } return (lo + hi) / 2; };
+export const SX = v => stretch(v, STX), SY = v => stretch(v, STY);
+export const P = (gx, gy, z = 0) => { const X = SX(gx), Y = SY(gy); return [OX + (X - Y) * TW / 2, OY + (X + Y) * TH / 2 - z]; };
+export const unP = (sx, sy) => { const a = (sx - OX) / (TW / 2), b = (sy - OY) / (TH / 2); return { gx: unstretch((a + b) / 2, STX), gy: unstretch((b - a) / 2, STY) }; };
 
 // ---------- helper dasar ----------
 function poly(ctx, pts, fill, stroke, lw = 1) {
@@ -45,27 +52,40 @@ export function tag(ctx, x, y, text, t, color = '#2fae6a') {
 }
 
 // ---------- zona ----------
-export const zoneAt = (gx, gy) => (gx >= 16 ? (gy < 10.3 ? 'boss' : 'garden') : gy < 5.2 ? (gx < 6.5 ? 'coffee' : 'ps') : gy < 10.3 ? (gx < V_X ? 'ctrl' : 'dev') : gx < V_X ? 'ops' : gx < 11.1 ? 'server' : 'play');
+export const zoneAt = (gx, gy) => (gx >= 21 && gy < 15.4 ? 'pool' : gy >= 15.4 ? (gx < V_X ? 'ctrl' : gx < 13.7 ? 'dev' : 'ops') : gx >= 16 ? (gy < 10.3 ? 'boss' : 'meet') : gy < 5.2 ? (gx < 6.5 ? 'coffee' : 'ps') : gy < 10.3 ? (gx < V_X ? 'ctrl' : 'dev') : gx < V_X ? 'ops' : gx < 11.1 ? 'server' : 'play');
 
 // Ruangan tumbuh mengikuti jumlah meja: semakin banyak karyawan, semakin lebar kantornya
-export const roomEnd = (g, d) => { const n = g.s.deskCount[d]; return d === 'dev' ? 7.4 + 1.95 * n + 0.65 : 0.7 + 1.95 * n + 0.9; };
-export const roomRects = g => ({
-  ctrl: [0.3, 5.5, roomEnd(g, 'ctrl'), 10.0], dev: [7.0, 5.5, roomEnd(g, 'dev'), 10.0], ops: [0.3, 10.4, roomEnd(g, 'ops'), 15], server: [7.0, 10.4, 11.0, 15], play: [11.2, 10.4, 16, 15]
-});
+export const roomEnd = (g, d) => { const n = Math.min(3, g.s.deskCount[d]); return d === 'dev' ? 7.4 + 1.95 * n + 0.65 : 0.7 + 1.95 * n + 0.9; };
+// baris kedua meja (meja ke-4..6) membuat ruangan makin dalam
+export const annexEnd = (g, d) => { const m = Math.min(3, Math.max(0, g.s.deskCount[d] - 6)); return d === 'ops' ? 14.2 + 1.95 * m + 0.65 : d === 'dev' ? 7.4 + 1.95 * m + 0.65 : 0.7 + 1.95 * m + 0.9; };
+export const roomRects = g => { const dc = g.s.deskCount, two = d => dc[d] > 3; return {
+  ctrl: [0.3, 5.5, roomEnd(g, 'ctrl'), two('ctrl') ? 10.0 : 8.2], dev: [7.0, 5.5, roomEnd(g, 'dev'), two('dev') ? 10.0 : 8.2], ops: [0.3, 10.4, roomEnd(g, 'ops'), two('ops') ? 15 : 12.7], server: [7.0, 10.4, 11.0, 15], play: [11.2, 10.4, 16, 15],
+  ctrlA: [0.3, 15.6, annexEnd(g, 'ctrl'), 20.2], devA: [7.0, 15.6, annexEnd(g, 'dev'), 20.2], opsA: [13.8, 18.6, annexEnd(g, 'ops'), 22.2]
+}; };
 // apakah petak (cx,cy) sudah dibangun, atau masih lahan kosong
 export function isBuilt(g, cx, cy) {
-  if (cx >= 16) return cy < 10.3;                                          // sayap Ruang Kepala Divisi
+  if (cy >= 15.4) {                                                       // Gedung Tambahan (selatan): hanya dibangun setelah meja ke-7+
+    const dc = g.s.deskCount, R = roomRects(g), inR = k => cx >= R[k][0] && cx < R[k][2] && cy >= R[k][1] && cy < R[k][3];
+    if (dc.ctrl > 6 && (inR('ctrlA') || (cx < 7 && cy < 18.0))) return true;
+    if (dc.dev > 6 && inR('devA')) return true;
+    if (dc.ops > 6 && (inR('opsA') || (cy >= 18.6 && cy < 20.0 && cx >= 6 && cx < 14.2))) return true;
+    if (cx >= 6 && cx < 7 && (dc.ctrl > 6 || dc.dev > 6 || dc.ops > 6)) return cy < (dc.ops > 6 ? 22 : 20.2);
+    return false;
+  }
+  if (cx >= 21) return g.s.fac.pool > 0 && cy < 10.3;                      // area kolam renang (dibangun setelah dibeli)
+  if (cx >= 16) return true;                                              // sayap timur: Ruang Kepala Divisi & Ruang Meeting
   if (cy < 5.2) return true;
   if (cx >= 6 && cx < 7) return true;                                     // lorong tegak
-  if (cy < 10.3) { if (cx < 6) return cx < roomEnd(g, 'ctrl') || cy < 7.0; return cx < roomEnd(g, 'dev'); }
-  if (cx < 7) return cx < roomEnd(g, 'ops') || cy < 12.0;
+  const R = roomRects(g), dc = g.s.deskCount, inR = k => cx >= R[k][0] && cx < R[k][2] && cy >= R[k][1] && cy < R[k][3];
+  if (cy < 10.3) { if (cx < 6) return inR('ctrl') || (cy < 7.2 || (dc.ctrl > 3 && cy >= 8.0 && cy < 9.4)); return inR('dev'); }
+  if (cx < 6) return inR('ops') || cy < 12.2 || (dc.ops > 3 && cy >= 12.4 && cy < 13.9);
   return true;                                                            // ruang server & taman bermain
 }
 
 // ---------- LANTAI ----------
 const FLOORS = {
   coffee: ['#f1ead6', '#e7dfc6'], ps: ['#d8b98a', '#cfae7d'], server: ['#5f7c78', '#56726e'],
-  play: ['#9bdc8a', '#ffe27a', '#8fd3ff', '#c8f0a0'], ctrl: ['#8fd3c8', '#84c9bd'], dev: ['#8fd1a6', '#85c79c'], ops: ['#c4d98f', '#b9cf84'], corr: ['#dfe9e1', '#d5e2da'], lot: ['#86c47a', '#7cbc72'], boss: ['#b98f5e', '#b08756']
+  play: ['#9bdc8a', '#ffe27a', '#8fd3ff', '#c8f0a0'], ctrl: ['#8fd3c8', '#84c9bd'], dev: ['#8fd1a6', '#85c79c'], ops: ['#c4d98f', '#b9cf84'], corr: ['#dfe9e1', '#d5e2da'], meet: ['#d6e0dc', '#cdd8d3'], pool: ['#e6dcc4', '#ddd2b8'], lot: ['#86c47a', '#7cbc72'], boss: ['#b98f5e', '#b08756']
 };
 export function drawFloor(ctx, g, t) {
   const s = g.s;
@@ -73,27 +93,39 @@ export function drawFloor(ctx, g, t) {
     const cx = gx + 0.5, cy = gy + 0.5;
     let z = zoneAt(cx, cy);
     if ((cy > 4.0 && cy < 5.0) || (cx > 6.0 && cx < 7.0 && cy >= 5.0)) z = 'corr';
-    if (!isBuilt(g, cx, cy)) z = 'lot';
+    if (!isBuilt(g, cx, cy)) continue;                                         // tidak ada lahan kosong: hanya bagian yang sudah dibangun
     const c = FLOORS[z], col = z === 'play' ? c[(gx + gy) % 4] : c[(gx + gy) % 2];
     poly(ctx, [P(gx, gy), P(gx + 1, gy), P(gx + 1, gy + 1), P(gx, gy + 1)], col, 'rgba(0,50,30,0.10)', 0.8);
+    if (!isBuilt(g, cx, cy + 1)) poly(ctx, [P(gx, gy + 1), P(gx + 1, gy + 1), P(gx + 1, gy + 1, -18), P(gx, gy + 1, -18)], '#b9c8be', 'rgba(0,40,20,0.3)');
+    if (!isBuilt(g, cx + 1, cy)) poly(ctx, [P(gx + 1, gy), P(gx + 1, gy + 1), P(gx + 1, gy + 1, -18), P(gx + 1, gy, -18)], '#9fb2a5', 'rgba(0,40,20,0.3)');
   }
-  // tebal lantai
-  poly(ctx, [P(0, GHT), P(GWD, GHT), P(GWD, GHT, -18), P(0, GHT, -18)], '#b9c8be', 'rgba(0,40,20,0.3)');
-  poly(ctx, [P(GWD, 0), P(GWD, GHT), P(GWD, GHT, -18), P(GWD, 0, -18)], '#9fb2a5', 'rgba(0,40,20,0.3)');
   // karpet lounge
   poly(ctx, [P(9.0, 1.8), P(14.6, 1.8), P(14.6, 3.7), P(9.0, 3.7)], '#4fae7c', 'rgba(255,255,255,0.5)', 2);
   poly(ctx, [P(9.2, 2.0), P(14.4, 2.0), P(14.4, 3.5), P(9.2, 3.5)], null, 'rgba(255,255,255,0.35)', 1.2);
   // karpet Ruang Kepala Divisi
   poly(ctx, [P(17.0, 1.9), P(20.7, 1.9), P(20.7, 6.4), P(17.0, 6.4)], '#2d6a4f', 'rgba(255,255,255,0.55)', 2);
   poly(ctx, [P(17.2, 2.1), P(20.5, 2.1), P(20.5, 6.2), P(17.2, 6.2)], null, 'rgba(255,216,77,0.7)', 1.4);
-  onFloor(ctx, 16.3, 9.85, 0, c => { c.fillStyle = 'rgba(70,40,10,0.6)'; c.font = font(900, 10.5); c.textBaseline = 'middle'; c.fillText('RUANG KEPALA DIVISI', 0, 0); });
-  // tepi & label tiap ruangan
+  // kolam renang
+  const pl = s.fac.pool, PW = [[22.0, 2.0, 26.2, 6.6], [21.9, 1.8, 26.6, 6.8], [21.8, 1.6, 27.2, 7.2]][Math.max(0, pl - 1)];
+  if (pl === 0) { const pa = [P(22.0, 2.0), P(26.2, 2.0), P(26.2, 6.6), P(22.0, 6.6)]; ctx.setLineDash([6, 5]); poly(ctx, pa, 'rgba(120,200,255,0.18)', 'rgba(255,255,255,0.85)', 2); ctx.setLineDash([]); onFloor(ctx, 23.6, 4.5, 0, c => { c.fillStyle = 'rgba(255,255,255,0.85)'; c.font = font(900, 46); c.textBaseline = 'middle'; c.fillText('?', 0, 0); }); }
+  else {
+    const [x0, y0, x1, y1] = PW;
+    poly(ctx, [P(x0 - 0.25, y0 - 0.25), P(x1 + 0.25, y0 - 0.25), P(x1 + 0.25, y1 + 0.25), P(x0 - 0.25, y1 + 0.25)], '#f4efe2', 'rgba(0,50,30,0.3)', 2);
+    const wg = ctx.createLinearGradient(...P(x0, y0), ...P(x1, y1)); wg.addColorStop(0, '#5fc8f0'); wg.addColorStop(1, '#2f9ad6');
+    poly(ctx, [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)], wg, '#ffffff', 2.5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.6;
+    for (let k = 0; k < 6; k++) { const yy = y0 + 0.5 + k * ((y1 - y0 - 0.8) / 5), a = P(x0 + 0.3, yy), b = P(x1 - 0.3, yy); ctx.beginPath(); ctx.moveTo(a[0], a[1]); for (let u = 0; u <= 10; u++) { const f = u / 10, px = a[0] + (b[0] - a[0]) * f, py = a[1] + (b[1] - a[1]) * f + Math.sin(t * 2 + f * 9 + k) * 1.8; ctx.lineTo(px, py); } ctx.stroke(); }
+  }
+  // karpet Ruang Meeting
+  poly(ctx, [P(16.5, 11.0), P(20.9, 11.0), P(20.9, 14.9), P(16.5, 14.9)], '#5a7aa0', 'rgba(255,255,255,0.55)', 2);
+  poly(ctx, [P(16.7, 11.2), P(20.7, 11.2), P(20.7, 14.7), P(16.7, 14.7)], null, 'rgba(255,255,255,0.4)', 1.2);
+  // tepi tiap ruangan
   const ROOMS = roomRects(g);
-  for (const k of ['ctrl', 'dev', 'ops', 'server']) {
-    const [x0, y0, x1, y1] = ROOMS[k], col = k === 'server' ? '#7fffd4' : DEPTS[k].color;
+  const dcA = g.s.deskCount;
+  for (const k of ['ctrl', 'dev', 'ops', 'server', ...(dcA.ctrl > 6 ? ['ctrlA'] : []), ...(dcA.dev > 6 ? ['devA'] : []), ...(dcA.ops > 6 ? ['opsA'] : [])]) {
+    const [x0, y0, x1, y1] = ROOMS[k], col = k === 'server' ? '#7fffd4' : DEPTS[k.replace('A', '')].color;
     poly(ctx, [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)], null, 'rgba(255,255,255,0.55)', 2);
     poly(ctx, [P(x0, y1 - 0.14), P(x1, y1 - 0.14), P(x1, y1), P(x0, y1)], col, null);
-    onFloor(ctx, x0 + 0.25, y1 - 0.3, 0, c => { c.fillStyle = 'rgba(10,70,45,0.6)'; c.font = font(900, 10.5); c.textBaseline = 'middle'; c.fillText((k === 'server' ? 'RUANG SERVER' : DEPTS[k].name).toUpperCase(), 0, 0); });
   }
   // taman bermain
   const lv = s.fac.play;
@@ -114,12 +146,20 @@ function windowW(ctx, u, v, w, h, hour, t) {
   ctx.beginPath(); ctx.moveTo(u + w / 2, v); ctx.lineTo(u + w / 2, v + h); ctx.moveTo(u, v + h / 2); ctx.lineTo(u + w, v + h / 2); ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.85)'; const cx = u + ((t * 6) % (w + 20)) - 10; ctx.beginPath(); ctx.arc(cx, v + h * 0.3, 6, 0, TAU); ctx.arc(cx + 7, v + h * 0.3 + 2, 5, 0, TAU); ctx.fill();
 }
+function plate2(c, u, v, w, title, sub, color) {
+  rr(c, u, v, w, 26, 6); c.fillStyle = color; c.fill(); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.5; c.stroke();
+  // ukuran huruf menyesuaikan lebar plat agar teks tidak keluar / menumpuk
+  const fit = (txt, wt, size) => { let fs = size; c.font = font(wt, fs); while (c.measureText(txt).width > w - 12 && fs > 5) { fs -= 0.3; c.font = font(wt, fs); } return fs; };
+  c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = font(900, fit(title, 900, 10)); c.fillText(title, u + w / 2, v + 9);
+  c.font = font(600, fit(sub, 600, 7.2)); c.fillStyle = 'rgba(255,255,255,0.9)'; c.fillText(sub, u + w / 2, v + 19.5);
+}
 function banner(c, u, v, w, text, color = '#245a40') {
   rr(c, u, v, w, 18, 6); c.fillStyle = color; c.fill(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1.5; c.stroke();
   c.fillStyle = '#fff'; c.font = font(900, 9.5); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, u + w / 2, v + 9.5);
 }
 export function drawWalls(ctx, g, t, hour, using) {
-  const s = g.s, W = GWD, H = GHT;
+  const s = g.s, W = s.fac.pool > 0 ? 28 : 21, H = s.deskCount.ctrl > 6 ? 20.2 : 15, HO = GHT;
   poly(ctx, [P(0, 0, 0), P(0, H, 0), P(0, H, WH), P(0, 0, WH)], '#d4e8da', null);
   poly(ctx, [P(0, 0, 0), P(W, 0, 0), P(W, 0, WH), P(0, 0, WH)], '#e6f3ea', null);
   poly(ctx, [P(0, 0, 0), P(0, H, 0), P(0, H, 30), P(0, 0, 30)], '#5fb585', null);
@@ -139,7 +179,9 @@ export function drawWalls(ctx, g, t, hour, using) {
     rr(c, 136, -112, 50, 56, 5); c.fillStyle = '#1f3d33'; c.fill(); c.strokeStyle = '#d9b27a'; c.lineWidth = 3; c.stroke();
     c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(800, 9); c.fillText('☕ MENU', 161, -100);
     c.font = font(600, 7); c.fillStyle = '#a8e0be'; c.fillText('Kopi Tubruk', 161, -86); c.fillText('Latte Neko', 161, -76); c.fillText('Teh Hijau', 161, -66);
-    banner(c, 14, -128, 80, 'PANTRY & KOPI', '#2c8a5c'); banner(c, 240, -128, 90, 'LOUNGE & GAME', '#2c8a5c');
+    banner(c, 14, -128, 80, 'PANTRY & KOPI', '#2c8a5c');
+    c.translate((SX(7) - 7) * 32, 0);   // dekor dinding sisi lounge ikut bergeser karena lorong dilebarkan
+    banner(c, 240, -128, 90, 'LOUNGE & GAME', '#2c8a5c');
     windowW(c, 224, -112, 46, 50, hour, t);
     c.save(); c.shadowColor = '#5affc0'; c.shadowBlur = s.fac.ps ? 10 + Math.sin(t * 5) * 3 : 0; c.fillStyle = s.fac.ps ? '#7dffd0' : '#9bb8aa'; c.font = font(900, 10); c.fillText('GAME ON!', 295, -90); c.restore();
     // TV (gx 10.6..13.3)
@@ -162,33 +204,40 @@ export function drawWalls(ctx, g, t, hour, using) {
   });
   // ----- dinding kanan: Ruang Kepala Divisi (gx 16..21) -----
   onWallR(ctx, 0, 0, c => {
+    c.translate((SX(16.2) - 16.2) * 32, 0);
     banner(c, 16.4 * 32, -128, 170, 'RUANG KEPALA DIVISI', '#7a5a1f');
     windowW(c, 17.0 * 32, -112, 56, 52, hour, t);
     rr(c, 19.4 * 32, -110, 44, 54, 3); c.fillStyle = '#fff'; c.fill(); c.strokeStyle = '#7a5a1f'; c.lineWidth = 3; c.stroke();
     c.fillStyle = '#2c8a5c'; c.font = font(900, 8); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('VISI', 19.4 * 32 + 22, -98); c.fillText('2030', 19.4 * 32 + 22, -88); star4(c, 19.4 * 32 + 22, -72, 8, '#ffd84d');
     rr(c, 20.5 * 32, -104, 30, 40, 3); c.fillStyle = '#eaf6ee'; c.fill(); c.strokeStyle = '#7a5a1f'; c.lineWidth = 2.4; c.stroke(); c.fillStyle = '#1f6a45'; c.font = font(900, 6.5); c.fillText('SERTIFIKAT', 20.5 * 32 + 15, -90); c.fillRect(20.5 * 32 + 6, -84, 18, 2); c.fillRect(20.5 * 32 + 6, -78, 18, 2); c.fillStyle = '#ffd84d'; c.beginPath(); c.arc(20.5 * 32 + 15, -70, 4, 0, TAU); c.fill();
   });
+  // ----- dinding kanan: area kolam renang (gx 21..28) -----
+  if (s.fac.pool > 0) onWallR(ctx, 0, 0, c => {
+    c.translate((SX(21.2) - 21.2) * 32, 0);
+    banner(c, 22.0 * 32, -128, 150, 'AREA KOLAM RENANG', '#2f7fa8');
+    windowW(c, 22.2 * 32, -108, 52, 46, hour, t); windowW(c, 24.6 * 32, -108, 52, 46, hour, t);
+    for (const gx of [23.9, 26.4]) { rr(c, gx * 32, -100, 22, 36, 3); c.fillStyle = '#eaf6ff'; c.fill(); c.strokeStyle = '#2f7fa8'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#2f7fa8'; c.font = font(900, 7); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🏊', gx * 32 + 11, -82); }
+  });
   // ----- dinding kiri (gx=0): u = (15 - gy) * 32 -----
-  const U = gy => (H - gy) * 32;
-  onWallL(ctx, H, 0, c => {
+  const U = gy => (SY(HO) - SY(gy)) * 32;
+  onWallL(ctx, HO, 0, c => {
     windowW(c, U(2.6), -112, 52, 50, hour, t);
     const ck = U(4.2) + 20; c.fillStyle = '#fff'; c.strokeStyle = '#2c8a5c'; c.lineWidth = 3; c.beginPath(); c.arc(ck, -92, 14, 0, TAU); c.fill(); c.stroke();
     c.strokeStyle = '#1f3a2e'; c.lineCap = 'round'; c.lineWidth = 2; const hh = (hour % 12) / 12 * TAU - Math.PI / 2, mm = (hour % 1) * TAU - Math.PI / 2;
     c.beginPath(); c.moveTo(ck, -92); c.lineTo(ck + Math.cos(hh) * 7, -92 + Math.sin(hh) * 7); c.stroke(); c.lineWidth = 1.4; c.beginPath(); c.moveTo(ck, -92); c.lineTo(ck + Math.cos(mm) * 10, -92 + Math.sin(mm) * 10); c.stroke();
     if (s.decor.neon) { c.save(); c.shadowColor = '#7dffd0'; c.shadowBlur = 12 + Math.sin(t * 4) * 3; star4(c, U(4.6), -76, 13, '#7dffd0'); c.restore(); }
     // ruang Pengendalian (gy 5.5..10): papan, jendela
-    banner(c, U(9.9), -126, 124, 'PENGENDALIAN SISTEM', '#2a7f8e');
-    c.textAlign = 'center'; c.font = font(600, 7.5); c.fillStyle = '#2a7f8e'; c.fillText('Governance, Risk & Compliance', U(9.9) + 62, -102);
+    plate2(c, U(9.9) + 2, -132, 130, 'PENGENDALIAN SISTEM', 'Governance, Risk & Compliance', '#2a7f8e');
     windowW(c, U(8.8), -92, 46, 44, hour, t);
     // papan statistik kontrol
     rr(c, U(7.1), -96, 56, 36, 4); c.fillStyle = '#fff'; c.fill(); c.strokeStyle = '#2a7f8e'; c.lineWidth = 2; c.stroke();
     c.strokeStyle = '#2a7f8e'; c.lineWidth = 2; c.beginPath(); c.moveTo(U(7.1) + 8, -68); c.lineTo(U(7.1) + 20, -80); c.lineTo(U(7.1) + 32, -74); c.lineTo(U(7.1) + 46, -88); c.stroke();
     // ruang Operasional (gy 10.4..15)
-    banner(c, U(14.8), -126, 150, 'OPERASIONAL & INFRASTRUKTUR', '#8a8a2a');
-    c.fillStyle = '#6d6d1f'; c.font = font(600, 7.5); c.fillText('Operations & Infrastructure', U(14.8) + 75, -102);
-    windowW(c, U(13.3), -92, 46, 44, hour, t);
-    const danger = s.risk > 70; rr(c, U(11.7), -92, 76, 20, 6); c.fillStyle = '#10231d'; c.fill(); c.strokeStyle = danger ? '#ff5a6e' : '#7fffd4'; c.lineWidth = 2; c.stroke();
-    c.fillStyle = danger ? '#ff8a9a' : '#7fffd4'; c.font = font(800, 8.5); c.textBaseline = 'middle'; c.fillText(danger ? '⚠ WASPADA ⚠' : 'SEMUA AMAN ✔', U(11.7) + 38, -81.5);
+    const O = U(14.9);
+    plate2(c, O, -132, 140, 'OPERASIONAL & INFRASTRUKTUR', 'Operations & Infrastructure', '#8a8a2a');
+    windowW(c, O + 8, -90, 46, 44, hour, t);
+    const danger = s.risk > 70; rr(c, O + 60, -88, 80, 20, 6); c.fillStyle = '#10231d'; c.fill(); c.strokeStyle = danger ? '#ff5a6e' : '#7fffd4'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = danger ? '#ff8a9a' : '#7fffd4'; c.font = font(800, 8.5); c.textBaseline = 'middle'; c.fillText(danger ? '⚠ WASPADA ⚠' : 'SEMUA AMAN ✔', O + 60 + 40, -77.5);
   });
 }
 
@@ -218,9 +267,14 @@ function partition(push, axis, fixed, a0, a1, gaps = []) {
 }
 // papan nama ruangan yang berdiri di atas sekat belakang
 function roomSign(ctx, gx0, gy, w, name, sub, color) {
-  const [x, y] = P(gx0, gy, 50); ctx.save(); ctx.translate(x, y); ctx.transform(1, 0.5, 0, 1, 0, 0);
-  const wpx = w * 32; rr(ctx, 0, -30, wpx, 28, 6); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = font(900, 11.5); ctx.fillText(name, wpx / 2, -19); ctx.font = font(600, 7.5); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(sub, wpx / 2, -8); ctx.restore();
+  // papan melayang di atas sekat/rak (z 96-124) dan digambar paling akhir, jadi selalu terbaca
+  const wpx = w * 32;
+  for (const gx of [gx0 + 0.05, gx0 + w - 0.05]) { const a = P(gx, gy, 50), b = P(gx, gy, 98); ctx.strokeStyle = 'rgba(40,100,70,0.7)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+  const [x, y] = P(gx0, gy, 98); ctx.save(); ctx.translate(x, y); ctx.transform(1, 0.5, 0, 1, 0, 0);
+  rr(ctx, 0, -30, wpx, 28, 6); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.stroke();
+  const fit = (txt, wt, size) => { let fs = size; ctx.font = font(wt, fs); while (ctx.measureText(txt).width > wpx - 12 && fs > 5) { fs -= 0.3; ctx.font = font(wt, fs); } return fs; };
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = font(900, fit(name, 900, 11.5)); ctx.fillText(name, wpx / 2, -19);
+  ctx.font = font(600, fit(sub, 600, 7.5)); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillText(sub, wpx / 2, -8); ctx.restore();
 }
 function rack(ctx, gx, gy, t, danger, i) {
   box(ctx, gx, gy, 0.95, 0.86, 80, '#3c4858', 0, { top: '#56637a' });
@@ -250,11 +304,18 @@ export function collectProps(g, t, hour, using, push) {
   // --- sekat kaca & papan nama ruangan ---
   const RC = roomRects(g);
   partition(push, 'x', 5.5, 0.3, RC.ctrl[2]); partition(push, 'x', 5.5, 7.0, RC.dev[2]);
-  partition(push, 'y', 7.0, 5.5, 10.0, [[6.0, 6.9]]);
+  partition(push, 'y', 7.0, 5.5, RC.dev[3], [[6.0, 6.9], [8.1, 8.9]]);
   partition(push, 'x', 10.4, 0.3, RC.ops[2]); partition(push, 'x', 10.4, 7.0, 11.0);
+  partition(push, 'y', 16.0, 10.4, 15, [[11.4, 13.2]]);
+  push(1000, ctx => roomSign(ctx, 16.5, 10.4, 4.2, 'RUANG MEETING', 'Rapat & kick-off proyek', 'rgba(60,90,140,0.92)'));
   partition(push, 'y', 7.0, 10.4, 15, [[11.2, 13.2]]);
-  push(7.0 + 5.5 + 1, ctx => roomSign(ctx, 7.3, 5.5, Math.min(5.8, RC.dev[2] - 7.4), 'PENGEMBANGAN SISTEM', 'System Development', 'rgba(30,125,80,0.92)'));
-  push(7.0 + 10.4 + 1, ctx => roomSign(ctx, 7.3, 10.4, 3.5, 'RUANG SERVER', 'Data Center', 'rgba(55,70,90,0.92)'));
+  push(1001, ctx => roomSign(ctx, 7.3, 5.5, Math.min(5.8, RC.dev[2] - 7.4), 'PENGEMBANGAN SISTEM', 'System Development', 'rgba(30,125,80,0.92)'));
+  push(1000, ctx => roomSign(ctx, 7.3, 10.4, 3.5, 'RUANG SERVER', 'Data Center', 'rgba(55,70,90,0.92)'));
+  // Gedung Tambahan (selatan): muncul setelah meja ke-7 di tiap departemen dibeli
+  const dcX = s.deskCount;
+  if (dcX.ctrl > 6) { partition(push, 'x', 15.6, 0.3, RC.ctrlA[2]); push(1002, ctx => roomSign(ctx, 0.5, 15.6, Math.max(3.4, RC.ctrlA[2] - 0.8), 'PENGENDALIAN · TAMBAHAN', 'Gedung Tambahan', 'rgba(42,127,142,0.92)')); }
+  if (dcX.dev > 6) { partition(push, 'x', 15.6, 7.0, RC.devA[2]); partition(push, 'y', 7.0, 15.6, 20.2, [[16.7, 17.3]]); push(1002, ctx => roomSign(ctx, 7.3, 15.6, Math.max(3.4, RC.devA[2] - 7.7), 'PENGEMBANGAN · TAMBAHAN', 'Gedung Tambahan', 'rgba(30,125,80,0.92)')); }
+  if (dcX.ops > 6) { partition(push, 'x', 18.6, 13.8, RC.opsA[2]); partition(push, 'y', 13.8, 18.6, 22.2, [[19.0, 19.7]]); push(1002, ctx => roomSign(ctx, 14.0, 18.6, Math.max(3.4, RC.opsA[2] - 14.4), 'OPERASIONAL · TAMBAHAN', 'Gedung Tambahan', 'rgba(130,130,30,0.92)')); }
 
   // --- Ruang Kepala Divisi ---
   partition(push, 'y', 16.0, 0.3, 10.0, [[4.2, 5.8]]);
@@ -284,13 +345,13 @@ export function collectProps(g, t, hour, using, push) {
     ctx.strokeStyle = 'rgba(0,50,30,0.35)'; ctx.lineWidth = 1.2; for (const gy of [7.2, 8.0]) { const a = P(16.5, gy, 18), b = P(17.3, gy, 18); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
   });
   push(17.8 + 7.0 + 0.6, ctx => box(ctx, 17.8, 6.9, 0.9, 0.9, 12, '#d7b98a', 0, { top: '#e8cfa6' }));
-  [[18.2, 5.0], [19.8, 5.0]].forEach(([gx, gy]) => push(gx + gy + 0.4, ctx => { box(ctx, gx, gy, 0.6, 0.6, 14, '#4a5a52', 0, { top: '#5c7068' }); box(ctx, gx, gy + 0.5, 0.6, 0.1, 40, '#4a5a52', 0); }));
+  [[18.2, 5.9], [19.8, 5.9]].forEach(([gx, gy]) => push(gx + gy + 0.4, ctx => { box(ctx, gx, gy, 0.6, 0.6, 14, '#4a5a52', 0, { top: '#5c7068' }); box(ctx, gx, gy + 0.5, 0.6, 0.1, 40, '#4a5a52', 0); }));
   [[20.6, 1.2], [16.6, 9.5], [20.6, 9.4]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.2)));
   // --- meja kerja tiga departemen ---
-  for (let i = 0; i < 9; i++) {
-    const { x: gx, y: gy } = deskXY(i), col = i % 3, dept = DEPT_KEYS[Math.floor(i / 3)];
+  for (let i = 0; i < 27; i++) {
+    const { x: gx, y: gy } = deskXY(i), col = i % 3, dept = DEPT_KEYS[Math.floor(i / 9)];
     if (!g.deskOwned(i)) {
-      if (col !== s.deskCount[dept]) continue;
+      if (i % 9 !== s.deskCount[dept]) continue;
       push(gx + gy + 1.2, ctx => {
         ctx.save(); ctx.setLineDash([6, 5]); poly(ctx, [P(gx, gy), P(gx + 1.7, gy), P(gx + 1.7, gy + 0.9), P(gx, gy + 0.9)], 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.9)', 2.2); ctx.restore();
         const [x, y] = P(gx + 0.85, gy + 0.45); ctx.fillStyle = '#fff'; ctx.font = font(900, 24); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('+', x, y - 2);
@@ -303,14 +364,12 @@ export function collectProps(g, t, hour, using, push) {
       const [x, y] = P(ex, ey, 0);
       ctx.fillStyle = 'rgba(0,40,20,0.18)'; ell(ctx, x, y + 2, 16, 7); ctx.fill();
       ctx.strokeStyle = '#3c4858'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 9); ctx.stroke();
-      const c3 = [DEPTS.ctrl.color, DEPTS.dev.color, DEPTS.ops.color][Math.floor(i / 3)];
+      const c3 = [DEPTS.ctrl.color, DEPTS.dev.color, DEPTS.ops.color][Math.floor(i / 9)];
       box(ctx, ex - 0.34, ey - 0.42, 0.68, 0.14, 40, c3, 8);
       ell(ctx, x, y - 10, 15, 7); ctx.fillStyle = shade(c3, 0.12); ctx.fill(); ctx.strokeStyle = 'rgba(0,40,20,0.3)'; ctx.lineWidth = 1; ctx.stroke();
     });
     push(gx + gy + 1.35, ctx => deskDraw(ctx, g, i, t));
   }
-  // meja rapat bundar di ruang Pengembangan
-  push(8.9 + 9.0 + 0.3, ctx => { const [x, y] = P(8.9, 9.0); ctx.fillStyle = 'rgba(0,40,20,0.2)'; ell(ctx, x, y + 2, 50, 22); ctx.fill(); ctx.strokeStyle = '#a8b8b0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 14); ctx.stroke(); ell(ctx, x, y - 16, 44, 21); ctx.fillStyle = '#d9ad78'; ctx.fill(); ctx.strokeStyle = '#b88a55'; ctx.lineWidth = 2; ctx.stroke(); ell(ctx, x, y - 18, 36, 16); ctx.fillStyle = '#e8c597'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 10, y - 26, 14, 8); ctx.fillStyle = '#3fa56f'; ctx.fillRect(x + 8, y - 26, 8, 6); });
 
   // --- ruang server ---
   [0, 1, 2].forEach(i => push(7.3 + i * 1.05 + 10.55, ctx => rack(ctx, 7.3 + i * 1.05, 10.55, t, danger, i)));
@@ -362,10 +421,8 @@ export function collectProps(g, t, hour, using, push) {
   push(11.2 + 2.5 + 0.9, ctx => box(ctx, 11.2, 2.5, 1.4, 0.7, 14, '#d7b98a', 0, { top: '#e8cfa6' }));
   if (s.decor.beanbag) push(8.6 + 2.8 + 0.3, ctx => { const [x, y] = P(8.7, 2.9); ctx.fillStyle = 'rgba(0,40,20,0.18)'; ell(ctx, x, y + 2, 22, 9); ctx.fill(); ell(ctx, x, y - 12, 20, 16); ctx.fillStyle = '#5ab8f5'; ctx.fill(); ctx.strokeStyle = '#3d8bd6'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 5, y - 16, 2, 0, TAU); ctx.arc(x + 5, y - 16, 2, 0, TAU); ctx.fill(); });
   if (s.decor.aquarium) push(15.2 + 0.6, ctx => { box(ctx, 14.9, 0.2, 0.9, 0.6, 38, '#d9e6e0', 0); const a = P(14.95, 0.8, 70), b = P(15.75, 0.8, 70), c2 = P(15.75, 0.8, 40), d2 = P(14.95, 0.8, 40); poly(ctx, [a, b, c2, d2], 'rgba(130,210,245,0.85)', '#fff', 2); for (let k = 0; k < 2; k++) { const gx2 = 15.05 + ((Math.sin(t * (0.8 + k * 0.3) + k * 2) + 1) / 2) * 0.6, p = P(gx2, 0.8, 52 + k * 9); ctx.fillStyle = k ? '#ffb86b' : '#ff7a59'; ell(ctx, p[0], p[1], 5, 3); ctx.fill(); } });
-  lotMarkers(g, t, push);
+  meetingProps(g, t, push, MEET_SEATS); poolProps(g, t, push);
   // --- tanaman ---
-  // taman luar di sebelah ruang kepala divisi
-  [[17.5, 12.5], [19.6, 11.5], [20.5, 14.0], [18.0, 14.3]].forEach(([gx, gy]) => push(gx + gy, ctx => { const [x, y] = P(gx, gy); ctx.fillStyle = 'rgba(0,50,20,0.2)'; ell(ctx, x, y + 2, 22, 8); ctx.fill(); ctx.fillStyle = '#6b4a2a'; ctx.fillRect(x - 3, y - 26, 6, 26); ctx.fillStyle = '#2f9a5a'; ell(ctx, x, y - 36, 22, 20); ctx.fill(); ctx.fillStyle = '#3fbf7f'; ell(ctx, x - 6, y - 40, 12, 11); ctx.fill(); }));
   [[0.55, 4.5], [6.4, 4.6], [15.4, 4.5], [6.5, 14.6], [15.4, 14.7]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1)));
   if (s.decor.plant) [[6.25, 1.0], [0.6, 9.5], [15.3, 9.4], [11.1, 14.7]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.3)));
   // --- taman bermain ---
@@ -393,5 +450,37 @@ export function lotMarkers(g, t, push) {
     const x = roomEnd(g, d) + (d === 'dev' ? 0.9 : 0.5);
     push(x + y, ctx => { const [px, py] = P(x, y); ctx.fillStyle = 'rgba(0,50,20,0.18)'; ell(ctx, px, py + 2, 16, 6); ctx.fill(); ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText('🚧', px, py - 2); });
   }
+}
+// posisi label perluasan untuk tiap departemen (di lahan kosong)
+export function expandSpot(g, d) {
+  const n = g.s.deskCount[d];
+  if (n < 3) return { x: roomEnd(g, d) + (d === 'dev' ? 1.3 : 0.9) - 0.4, y: d === 'ops' ? 13.2 : 8.4 };
+  const p = deskXY(DEPT_KEYS.indexOf(d) * 9 + n); return { x: p.x + 0.85, y: p.y + 0.3 };
+}
+// Area kolam renang: kursi santai, payung, gazebo (level 2), perosotan air (level 3)
+export function poolProps(g, t, push) {
+  const pl = g.s.fac.pool; if (!pl) return;
+  [[22.2, 8.8, '#ffd84d'], [24.2, 8.8, '#5ab8f5'], [26.2, 8.8, '#ff7a59']].slice(0, pl === 1 ? 2 : 3).forEach(([gx, gy, c]) => push(gx + gy + 0.6, ctx => { box(ctx, gx, gy, 1.5, 0.6, 9, c, 0, { top: shade(c, 0.2) }); box(ctx, gx + 0.05, gy - 0.35, 0.5, 0.4, 24, c, 0, { top: shade(c, 0.2) }); }));
+  push(23.4 + 8.4, ctx => { const [x, y] = P(23.4, 8.4); ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 52); ctx.stroke(); ctx.fillStyle = '#ff7a59'; ctx.beginPath(); ctx.ellipse(x, y - 52, 30, 11, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x, y - 52, 30, 11, 0, Math.PI * 1.3, Math.PI * 1.7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y - 52, 30, 11, 0, Math.PI, 0, true); ctx.stroke(); });
+  if (pl >= 2) push(26.8 + 1.8, ctx => { box(ctx, 26.6, 0.6, 1.2, 1.0, 30, '#c9a36a', 0, { top: '#e0bf8a' }); for (const gx of [26.5, 27.9]) { const a = P(gx, 0.5, 0), b = P(gx, 0.5, 62); ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); } poly(ctx, [P(26.2, 0.2, 62), P(28.1, 0.2, 62), P(28.1, 1.8, 62), P(26.2, 1.8, 62)], '#2f9ad6', 'rgba(255,255,255,0.7)', 2); });
+  if (pl >= 3) push(21.6 + 6.0, ctx => { box(ctx, 21.4, 5.6, 0.7, 0.7, 50, '#ffd84d', 0, { top: '#ffe98a' }); const a = P(22.1, 5.7, 50), b = P(22.1, 6.2, 50), c2 = P(23.3, 6.2, 8), d2 = P(23.3, 5.7, 8); poly(ctx, [a, b, c2, d2], '#7fe0ff', '#fff', 2); });
+  [[21.6, 9.6], [27.0, 9.4]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.2)));
+}
+// Ruang Meeting: meja panjang, kursi, layar presentasi
+export function meetingProps(g, t, push, MEET) {
+  [0, 1, 2].forEach(i => push(17.5 + i * 1.2 + 12.9, ctx => box(ctx, 16.9 + i * 1.2, 12.3, 1.2, 1.2, 26, '#c9a36a', 0, { top: '#e0bf8a' })));
+  MEET.forEach(([sx, sy], i) => push(sx + sy - 0.3, ctx => {
+    const [x, y] = P(sx, sy, 0); ctx.fillStyle = 'rgba(0,40,20,0.18)'; ell(ctx, x, y + 2, 15, 6); ctx.fill();
+    ctx.strokeStyle = '#3c4858'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 9); ctx.stroke();
+    if (sy < 13) box(ctx, sx - 0.32, sy - 0.4, 0.64, 0.12, 36, '#5a7aa0', 8); else box(ctx, sx - 0.32, sy + 0.32, 0.64, 0.12, 36, '#5a7aa0', 8);
+    ell(ctx, x, y - 10, 14, 6.5); ctx.fillStyle = '#6f8fb8'; ctx.fill(); ctx.strokeStyle = 'rgba(0,40,20,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+  }));
+  push(18.9 + 10.7, ctx => { // layar presentasi
+    box(ctx, 18.0, 10.6, 1.8, 0.1, 62, '#1d2a27', 0, { top: '#2b3a36' });
+    const a = P(18.1, 10.72, 58), b = P(19.7, 10.72, 58), c2 = P(19.7, 10.72, 22), d2 = P(18.1, 10.72, 22); const gr = ctx.createLinearGradient(...a, ...c2); gr.addColorStop(0, '#eaf6ff'); gr.addColorStop(1, '#c9e4f5'); ctx.beginPath(); [a, b, c2, d2].forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.closePath(); ctx.fillStyle = gr; ctx.fill();
+    ctx.strokeStyle = '#2f6fd0'; ctx.lineWidth = 2; ctx.beginPath(); const pts = [[18.3, 28], [18.7, 40], [19.1, 34], [19.5, 48]].map(([gx, z]) => P(gx, 10.72, z)); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.stroke();
+    const active = g.s.projects.some(p => p.state === 'meeting'); ctx.fillStyle = active ? '#ff5a5a' : '#4a5a52'; const lp = P(19.75, 10.72, 60); ctx.beginPath(); ctx.arc(lp[0], lp[1], 2.4, 0, TAU); ctx.fill();
+  });
+  [[16.5, 14.7], [20.7, 10.9]].forEach(([gx, gy]) => push(gx + gy, ctx => plantAt(ctx, gx, gy, 1.1)));
 }
 export { poly, onWallR, onWallL, onFloor, plantAt };

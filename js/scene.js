@@ -1,5 +1,5 @@
 // Scene Canvas isometrik: kamera (geser/zoom), karyawan, Mochi, partikel, gelembung, hit-test.
-import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, fmtMoney, DEPT_KEYS, DESK_COSTS } from './data.js';
+import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js';
 import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js';
 import { deskXY, route, V_X, C1_Y } from './game.js';
 import * as I from './iso.js';
@@ -26,6 +26,7 @@ export class Scene {
     canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
     game.on('fx', f => this.onFx(f));
     game.on('popup', p => this.onPopup(p));
+    game.on('banner', b => { this.banner = { text: b.text, sub: b.sub, t: 0 }; });
     game.on('newday', d => { this.nightFade = 1; this.banner = { text: `Hari ke-${d.day}`, sub: `Gaji tim −${fmtMoney(d.salary)}`, t: 0 }; });
   }
 
@@ -40,7 +41,7 @@ export class Scene {
     this.cv.width = Math.round(this.vw * this.dpr); this.cv.height = Math.round(this.vh * this.dpr);
     const a = this.area, fit = this.minZoom();
     if (!this.placed) { // tampilan awal: tinggi pas, di tengah area meja
-      this.cam.z = a.w >= 700 ? fit : Math.max(fit, Math.min(a.w / 560, a.h / (WORLD_H - 40), 1.25)); this.cam.x = OX + 20; this.cam.y = 340; this.placed = true;
+      this.cam.z = a.w >= 700 ? Math.max(fit, Math.min(Math.min(a.w / 1250, a.h / 780), 1.1)) : Math.max(fit, Math.min(a.w / 560, a.h / 760, 1.25)); this.cam.x = OX + 40; this.cam.y = 560; this.placed = true;
     }
     this.cam.z = Math.max(fit, this.cam.z); this.clamp();
   }
@@ -96,8 +97,8 @@ export class Scene {
   }
   zoneHit(gx, gy) {
     const s = this.g.s;
-    for (let i = 0; i < 9; i++) { if (this.g.deskOwned(i)) continue; const { x, y } = deskXY(i); if (gx >= x - 0.1 && gx <= x + 1.8 && gy >= y - 0.1 && gy <= y + 1.0) return { type: 'desk', dept: DEPT_KEYS[Math.floor(i / 3)] }; }
-    if (gx < 0 || gy < 0 || gx > 21 || gy > 15) return null;
+    for (let i = 0; i < 27; i++) { if (this.g.deskOwned(i) || i % 9 !== s.deskCount[DEPT_KEYS[Math.floor(i / 9)]]) continue; const { x, y } = deskXY(i); if (gx >= x - 0.1 && gx <= x + 1.8 && gy >= y - 0.1 && gy <= y + 1.0) return { type: 'desk', dept: DEPT_KEYS[Math.floor(i / 9)] }; }
+    if (gx < 0 || gy < 0 || gx > 28 || gy > 22) return null;
     return { type: 'room', kind: I.zoneAt(gx, gy) };
   }
 
@@ -157,6 +158,7 @@ export class Scene {
         const w = this.worldPos(e.x, e.y, 70);
         if (e.st === 'sick' || (e.st === 'act' && e.act && e.act.kind === 'nap')) this.spawn({ kind: 'zzz', x: w.x + 12, y: w.y - 20, vx: 8, vy: -14, max: 1.8 });
         else if (e.st === 'act' && e.act && e.act.kind === 'ps') this.spawn({ kind: 'note', x: w.x + (Math.random() - 0.5) * 20, y: w.y - 28, vx: 6, vy: -22, max: 1.4 });
+        else if (e.st === 'act' && e.act && e.act.kind === 'pool') this.spawn({ kind: 'spark', x: w.x + (Math.random() - 0.5) * 34, y: w.y + 10, vy: -16, max: 0.8 });
         else if (e.st === 'act' && e.act && e.act.kind === 'play') this.spawn({ kind: 'star', x: w.x + (Math.random() - 0.5) * 30, y: w.y - 20, vx: (Math.random() - 0.5) * 20, vy: -26, g: 30, max: 1, size: 0.7 });
         else if (e.buff > 0 && e.st === 'work') this.spawn({ kind: 'spark', x: w.x + (Math.random() - 0.5) * 22, y: w.y - 10 + (Math.random() - 0.5) * 20, vy: -10, max: 0.8 });
       }
@@ -169,7 +171,8 @@ export class Scene {
     if (e.st === 'act' && e.act) {
       if (e.act.kind === 'ps') return 16;
       if (e.act.kind === 'play') return s.fac.play === 1 ? -4 : Math.abs(Math.sin(this.t * 7 + e.desk)) * 16;
-      if (e.act.kind === 'nap') return 18;
+      if (e.act.kind === 'nap' || e.act.kind === 'meeting') return 18;
+      if (e.act.kind === 'pool') return -9;
     }
     if ((e.st === 'work' || e.st === 'idle' || e.st === 'sick') && e.wslot < 0) return 18;
     return 0;
@@ -191,6 +194,7 @@ export class Scene {
     const items = []; const push = (d, fn) => items.push({ d, fn });
     I.collectProps(g, t, hour, using, push);
     for (const e of s.employees) push(e.x + e.y + 0.02, ctx2 => this.drawEmp(ctx2, e, t));
+    for (const e of s.employees) if (e.st === 'act' && e.act && e.act.kind === 'pool') push(e.x + e.y + 0.4, ctx2 => { const [wx, wy] = P(e.x, e.y, 0); ctx2.fillStyle = 'rgba(70,170,230,0.62)'; ell(ctx2, wx, wy - 2, 27, 12); ctx2.fill(); ctx2.strokeStyle = 'rgba(255,255,255,0.8)'; ctx2.lineWidth = 1.6; ell(ctx2, wx, wy - 2, 27 + Math.sin(t * 4) * 2, 12 + Math.sin(t * 4)); ctx2.stroke(); });
     push(18.7 + 2.9 + 0.02, ctx2 => this.drawDirector(ctx2, t));
     const m = this.mochi; push(m.x + m.y, ctx2 => { const [x, y] = P(m.x, m.y); drawMochi(ctx2, { x, y, s: 1.1, t, dir: m.dir, walking: m.walking }); this.hits.push({ type: 'mochi', x0: x - 24, x1: x + 24, y0: y - 52, y1: y + 6, pri: 5 }); });
     if (s.fac.play === 1) g.slots.play.forEach(id => { const e = id && g.emp(id); if (e && e.st === 'act') push(e.x + e.y + 0.5, ctx2 => I.ballsFront(ctx2, e.x, e.y, t)); });
@@ -198,6 +202,7 @@ export class Scene {
     if (this.gift) this.drawGift(ctx, t);
     this.drawTags(ctx, t);
     for (const e of s.employees) this.drawBubbles(ctx, e, t);
+    this.drawScold(ctx, t);
     this.drawParts(ctx, t);
     for (const p of this.petals) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(this.t + p.ph); ctx.fillStyle = 'rgba(200,255,200,0.7)'; ell(ctx, 0, 0, p.s, p.s * 0.55); ctx.fill(); ctx.restore(); }
     // overlay layar
@@ -216,9 +221,11 @@ export class Scene {
 
   drawDirector(ctx, t) {
     const s = this.g.s, [px, py] = P(18.7, 2.9, 18), writing = Math.sin(t * 0.35) > -0.2;
-    const mood = this.g.avgMood(), face = this.g.s.risk > 70 ? 'stress' : mood > 70 ? 'happy' : 'smile';
+    const sc = this.g.scold, mad = sc && sc.ready && sc.mode === 'marah', talk = sc && sc.ready;
+    const mood = this.g.avgMood(), face = mad ? 'stress' : talk && sc.mode === 'semangat' ? 'happy' : this.g.s.risk > 70 ? 'stress' : mood > 70 ? 'happy' : 'smile';
     this.hits.push({ type: 'boss', x0: px - 26, x1: px + 26, y0: py - 88, y1: py + 8, pri: 9 });
-    drawChibi(ctx, { x: px, y: py, s: S, look: s.dirLook, spec: 'dir', pose: writing ? 'type' : 'sit', t, face, dir: 1, phase: 0.5 });
+    const jx = mad ? Math.sin(t * 45) * 1.6 : 0;
+    drawChibi(ctx, { x: px + jx, y: py, s: S, look: s.dirLook, spec: 'dir', pose: mad ? 'cheer' : talk ? 'wave' : writing ? 'type' : 'sit', t, face, dir: 1, phase: 0.5 });
   }
 
   drawEmp(ctx, e, t) {
@@ -235,6 +242,9 @@ export class Scene {
         else if (k === 'ps') { pose = 'game'; held = 'pad'; face = 'excited'; }
         else if (k === 'play') { pose = s.fac.play === 1 ? 'ball' : 'bounce'; face = 'happy'; }
         else if (k === 'nap') { pose = 'sleep'; face = 'sleep'; }
+        else if (k === 'pool') { pose = 'ball'; face = 'happy'; }
+        else if (k === 'summon') { pose = 'stand'; face = this.g.scold && this.g.scold.mode === 'semangat' ? 'happy' : 'stress'; }
+        else if (k === 'meeting') { pose = 'sit'; face = Math.sin(t * 1.3 + e.desk) > 0.4 ? 'happy' : 'smile'; }
         break;
       }
       case 'work': pose = e.wslot >= 0 ? 'ttype' : 'type'; face = hi ? 'stress' : low ? 'tired' : 'focus'; break;
@@ -244,6 +254,18 @@ export class Scene {
     this.hits.push({ type: 'emp', id: e.id, x0: px - 26, x1: px + 26, y0: py - 88, y1: py + 8, pri: 10 });
     drawChibi(ctx, { x: px, y: py, s: S, look: e.look, spec: e.spec, pose, t, face, dir, held, phase: e.desk * 1.7 });
     if (e.rarity === 'SSR' || e.rarity === 'SR') { const a = (t * 2 + e.desk) % TAU; star4(ctx, px + Math.cos(a) * 26, py - 44 + Math.sin(a * 1.3) * 22, 3, e.rarity === 'SSR' ? '#ffd84d' : '#c9b8ff'); }
+  }
+
+  // gelembung ucapan Kepala Divisi saat memanggil / memarahi staf
+  drawScold(ctx, t) {
+    const sc = this.g.scold; if (!sc || !sc.ready || !sc.text) return;
+    const [px, py] = P(18.7, 2.9, 18), top = py - 96 - 6, mad = sc.mode === 'marah';
+    ctx.save(); ctx.font = font(900, mad ? 13 : 11.5); const w = Math.min(240, ctx.measureText(sc.text).width + 22), x = px + (mad ? Math.sin(t * 40) * 1.5 : 0);
+    ctx.translate(x, top); rr(ctx, -w / 2, -14, w, 28, 14); ctx.fillStyle = mad ? '#fff1f1' : '#fff'; ctx.fill(); ctx.strokeStyle = mad ? '#e5484d' : '#2fae6a'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(0, 22); ctx.lineTo(6, 14); ctx.fillStyle = mad ? '#fff1f1' : '#fff'; ctx.fill();
+    ctx.fillStyle = mad ? '#b3202a' : '#1f3a2e'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(sc.text, 0, 1);
+    if (mad) { ctx.font = '16px serif'; ctx.fillText('💢', w / 2 - 2, -16 + Math.sin(t * 12) * 2); ctx.fillText('💢', -w / 2 + 2, -16 + Math.cos(t * 11) * 2); }
+    ctx.restore();
   }
 
   drawBubbles(ctx, e, t) {
@@ -305,13 +327,16 @@ export class Scene {
       this.hits.push({ type: 'room', kind: k, x0: x - w / 2, x1: x + w / 2, y0: y - 16, y1: y + 20, pri: 6 });
     };
     if (s.fac.coffee && s.coffeeStock <= 0) { const [cx, cy] = P(2.0, 0.6, 118); I.tag(ctx, cx, cy, '☕ Stok habis! → Inbox', t, '#e5484d'); this.hits.push({ type: 'room', kind: 'inbox', x0: cx - 70, x1: cx + 70, y0: cy - 16, y1: cy + 20, pri: 7 }); }
+    tagFor('pool', 24.0, 4.2, 70);
     tagFor('coffee', 2.0, 0.6, 108); tagFor('ps', 12.0, 0.2, 140); tagFor('play', 13.4, 12.4, 40);
-    DEPT_KEYS.forEach((d, r) => {
-      const n = s.deskCount[d]; if (n >= 3 || !g.deptFull(d)) return;
-      const lx = (d === 'dev' ? 1.3 : 0.9) + (d === 'dev' ? 7.4 + 1.95 * n + 0.65 : 0.7 + 1.95 * n + 0.9) - 0.4, ly = d === 'ops' ? 13.2 : 8.4, [x, y] = P(lx, ly, 62), txt = `🏗️ +Meja Rp ${DESK_COSTS[g.totalDesks()]} jt`;
+    DEPT_KEYS.forEach(d => {
+      const n = s.deskCount[d]; if (n >= DESK_MAX || !g.deptFull(d)) return;
+      const sp = I.expandSpot(g, d), [x, y] = P(sp.x, sp.y, 62), txt = `🏗️ +Meja Rp ${DESK_COSTS[g.totalDesks()]} jt`;
       I.tag(ctx, x, y - 14, txt, t, '#8fa89a'); ctx.font = font(800, 11); const w = ctx.measureText(txt).width + 20;
       this.hits.push({ type: 'desk', dept: d, x0: x - w / 2, x1: x + w / 2, y0: y - 32, y1: y + 6, pri: 6 });
     });
+    const plan = s.projects.filter(p => p.state === 'plan').length;
+    if (plan) { const [mx, my] = P(18.6, 12.9, 70); I.tag(ctx, mx, my, `📋 Kick-off menunggu (${plan})`, t, '#e0a000'); ctx.font = font(800, 11); const w = ctx.measureText(`📋 Kick-off menunggu (${plan})`).width + 20; this.hits.push({ type: 'room', kind: 'meet', x0: mx - w / 2, x1: mx + w / 2, y0: my - 16, y1: my + 20, pri: 7 }); }
   }
 
   drawParts(ctx, t) {

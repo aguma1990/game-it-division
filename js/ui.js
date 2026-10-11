@@ -87,6 +87,7 @@ export class UI {
     const g = this.g;
     switch (e.st) {
       case 'sick': return '😵 Burnout — sedang pulih';
+      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
       case 'act': return ({ coffee: '☕ Sedang ngopi', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
       case 'queue': return '⏳ Antri fasilitas';
       case 'walk': return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
@@ -148,24 +149,40 @@ export class UI {
   // ----- Tab Inbox (persetujuan & memo) -----
   inboxView() {
     const g = this.g, s = g.s;
-    const sig = 'B' + this.focus + s.day + '|' + s.inbox.map(r => r.id + r.opts.map(o => (s.money >= o.cost ? 1 : 0)).join('')).join(',') + '|' + s.memos.length + '|' + s.coffeeStock;
+    const sig = 'B' + this.focus + s.day + '|' + s.inbox.map(r => r.id + r.opts.map(o => (s.money >= o.cost ? 1 : 0)).join('')).join(',') + '|' + s.memos.length + '|' + s.coffeeStock + '|' + (s.projects || []).map(p => p.id + p.state).join(',');
     let html = `<div class="t-sub" style="margin:2px 4px 8px;font-weight:700">Karyawan, Direksi, dan klien mengajukan permintaan. Kamu yang memutuskan — ada yang butuh <b>memo resmi</b> ✍️. Stok kopi: <b>☕ ${s.coffeeStock}</b> cangkir.</div>`;
     if (!s.inbox.length) html += `<div class="empty"><span class="big">📭</span>Tidak ada permintaan menunggu.<br>Bagus! Permintaan baru muncul tiap hari.</div>`;
     for (const r of s.inbox) {
       const e = r.from ? g.emp(r.from) : null, left = r.deadline - s.day;
       const who = e ? `<div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'smile', 40)}" alt=""></div>` : `<div class="ico" style="background:#2c8a5c;width:34px;height:34px;font-size:18px">${r.icon}</div>`;
-      const btns = r.opts.map(o => r.memo
+      const btns = r.opts.map(o => o.mg ? `<button class="btn lav sm" data-act="approvemg" data-id="${r.id}" data-k="${o.k}">🕹️ ${o.label}</button>` : r.memo
         ? `<button class="btn sm" data-act="memo" data-id="${r.id}" data-k="${o.k}">✍️ ${o.label}</button>`
         : `<button class="btn sm" data-act="approve" data-id="${r.id}" data-k="${o.k}" ${o.cost && s.money < o.cost ? 'disabled' : ''}>✅ ${o.label}${o.cost ? `<br><small>${fmtMoney(o.cost)}</small>` : ''}</button>`).join('');
       html += `<div class="card ${this.focus === r.id ? 'focus' : ''}"><div class="row">${who}<div class="grow"><div class="t-title">${r.icon} ${esc(r.title)}</div><div class="t-sub">${e ? 'Dari ' + esc(e.name) : 'Dari ' + esc(r.sender || 'Eksternal')}</div></div>
         <span class="chip ${left <= 1 ? 'late' : ''}">⏳ ${left <= 0 ? 'Hari ini' : left + ' hari'}</span></div>
         <div class="t-sub" style="margin-top:6px;font-weight:600;line-height:1.45">${esc(r.body)}</div>
         <div class="chips">${r.memo ? '<span class="chip warn">✍️ butuh memo</span>' : ''}${r.type === 'repair' ? '<span class="chip late">produktivitas −50% selama rusak</span>' : ''}</div>
-        <div class="acts" style="margin-top:8px">${btns}<button class="btn ghost sm" data-act="reject" data-id="${r.id}">❌ Tolak</button></div></div>`;
+        <div class="acts" style="margin-top:8px">${btns}${r.proj ? '' : `<button class="btn ghost sm" data-act="reject" data-id="${r.id}">❌ Tolak</button>`}</div></div>`;
+    }
+    const projs = s.projects || [];
+    if (projs.length) html += `<div class="sec-title"><span>📁 Proyek</span></div>`;
+    for (const p of projs) {
+      const left = p.deadline - s.day;
+      html += `<div class="card ${p.state === 'plan' ? 'done' : ''}"><div class="row"><div class="ico" style="background:#2c8a5c">📁</div><div class="grow"><div class="t-title">${esc(p.name)}</div><div class="t-sub">${p.state === 'plan' ? 'Disetujui — belum dimulai. Adakan rapat kick-off di Ruang Meeting!' : p.state === 'meeting' ? '📋 Rapat kick-off sedang berlangsung…' : p.state === 'wait' ? '⏸️ Menunggu keputusanmu di Inbox' : '⚙️ Sedang dikerjakan tim'}</div></div>${p.state === 'plan' ? `<span class="chip ${left <= 1 ? 'late' : ''}">⏳ ${left <= 0 ? 'Hari ini' : left + ' hari'}</span>` : ''}</div>
+        ${this.stepper(p)}${p.state === 'plan' ? `<div class="acts" style="margin-top:8px"><button class="btn sm" data-act="kickoff" data-id="${p.id}">🗓️ Adakan rapat kick-off</button></div>` : ''}</div>`;
     }
     html += `<div class="sec-title"><span>🗂️ Arsip memo (${s.stat.memos})</span></div>`;
     html += s.memos.slice(0, 5).map(m => `<div class="card"><div class="t-title" style="font-size:12px">📝 ${esc(m.subject)}</div><div class="t-sub">Hari ${m.day} · kepada ${esc(m.to)}</div><div class="t-sub" style="margin-top:4px;font-weight:600">${esc(m.text.length > 130 ? m.text.slice(0, 130) + '…' : m.text)}</div></div>`).join('') || '<div class="t-sub" style="padding:0 6px">Belum ada memo yang kamu tulis.</div>';
     return { html, sig };
+  }
+
+  // Langkah proyek: Kick-off → Analisis → Pengembangan → Implementasi → Go-Live
+  stepper(p) {
+    const labels = ['Kick-off', 'Analisis', 'Develop', 'Implement', 'Go-Live'];
+    const cur = p.state === 'plan' || p.state === 'meeting' ? 0 : (p.phase || 0) + 1 + (p.state === 'wait' ? 0 : 0);
+    const steps = labels.map((l, i) => `<span class="chip" style="${i < cur ? 'background:#d7f5e2;color:#1a7a4a' : i === cur ? 'background:#fff1c2;color:#8a5a00;box-shadow:0 0 0 2px #ffd84d' : ''}">${i < cur ? '✔' : i === cur ? '▶' : '○'} ${l}</span>`).join('');
+    const q = Math.max(0, Math.min(5, p.q || 0)), stars = '★'.repeat(Math.round(q)) + '☆'.repeat(5 - Math.round(q));
+    return `<div class="chips" style="margin-top:8px">${steps}</div>${p.state !== 'plan' && p.state !== 'meeting' ? `<div class="t-sub" style="margin-top:4px">Kualitas proyek: <b style="color:#e0a000">${stars}</b></div>` : ''}`;
   }
 
   // ----- Tab Tim -----
@@ -184,9 +201,9 @@ export class UI {
         <div class="mini"><span>😣</span>${this.bar('st', 'st:' + e.id, e.stress)}</div>
         <div class="mini"><span>💚</span>${this.bar('mo', 'mo:' + e.id, e.mood)}</div></div>
       <div class="t-sub" style="margin-top:6px;font-weight:800" data-status="${e.id}">${esc(this.statusText(e))}</div>
-      <div class="acts">${btn('coffee', '☕', 'Ngopi')}${btn('ps', '🎮', 'Main PS')}${btn('play', '🛝', 'Bermain')}${btn('nap', '😴', 'Tidur')}
+      <div class="acts">${btn('coffee', '☕', 'Ngopi')}${btn('ps', '🎮', 'Main PS')}${btn('play', '🛝', 'Bermain')}${btn('pool', '🏊', 'Berenang')}${btn('nap', '😴', 'Tidur')}
         <button class="btn mint" data-act="bonus" data-id="${e.id}" ${s.money < 1 ? 'disabled' : ''} title="Bonus Rp 1 jt">🎁</button>
-        <button class="btn ghost" data-act="rename" data-id="${e.id}" title="Ganti nama">✏️</button><button class="btn ghost" data-act="fire" data-id="${e.id}" title="Pecat" style="color:#d6334f">🚪</button><button class="btn gold" data-act="train" data-id="${e.id}" ${s.money < tc || e.skill >= 99 ? 'disabled' : ''} title="Kursus">📚 <small>${fmtMoney(tc).replace('Rp ', '')}</small></button></div></div>`;
+        <button class="btn ghost" data-act="rename" data-id="${e.id}" title="Ganti nama">✏️</button><button class="btn lav" data-act="summon" data-id="${e.id}" title="Panggil ke ruangan" ${e.st === 'sick' ? 'disabled' : ''}>📢</button><button class="btn ghost" data-act="fire" data-id="${e.id}" title="Pecat" style="color:#d6334f">🚪</button><button class="btn gold" data-act="train" data-id="${e.id}" ${s.money < tc || e.skill >= 99 ? 'disabled' : ''} title="Kursus">📚 <small>${fmtMoney(tc).replace('Rp ', '')}</small></button></div></div>`;
   }
   teamView() {
     const g = this.g, s = g.s, crew = s.employees.filter(e => !e.leaving);
@@ -196,10 +213,10 @@ export class UI {
     html += crew.map(e => this.empCard(e)).join('');
     html += `<div class="sec-title"><span>🌿 Calon karyawan (baru tiap hari)</span><button class="btn ghost sm" data-act="reroll" ${s.money < 1.5 ? 'disabled' : ''}>🔄 Cari lagi · Rp 1,5 jt</button></div>`;
     for (const c of s.candidates) {
-      const sp = SPECS[c.spec], R = RARITY[c.rarity], tr = TRAITS[c.trait], full = g.freeDesk(c.spec) < 0, maxed = full && s.deskCount[deptOfSpec(c.spec)] >= 3;
+      const sp = SPECS[c.spec], R = RARITY[c.rarity], tr = TRAITS[c.trait], full = g.freeDesk(c.spec) < 0, maxed = full && s.deskCount[deptOfSpec(c.spec)] >= DESK_MAX;
       html += `<div class="card"><div class="row"><div class="av" style="--rc:${R.color}"><img src="${portrait(c.look, c.spec, 'happy', 72)}" alt=""><span class="rar">${R.name}</span></div>
         <div class="grow"><div class="t-title">${esc(c.name)} <span class="chip" style="background:${R.color}33;color:${R.color}">${R.label}</span></div><div class="t-sub">${sp.emoji} ${sp.name} · ${DEPTS[deptOfSpec(c.spec)].name}</div>
-        <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 ${c.skill}</span>${full ? `<span class="chip late">🪑 ${maxed ? 'departemen penuh (3/3)' : 'butuh meja'}</span>` : ''}<span class="chip">💸 ${fmtMoney(c.salary)}/hari</span></div></div>
+        <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 ${c.skill}</span>${full ? `<span class="chip late">🪑 ${maxed ? `departemen penuh (${DESK_MAX}/${DESK_MAX})` : 'butuh meja'}</span>` : ''}<span class="chip">💸 ${fmtMoney(c.salary)}/hari</span></div></div>
         <button class="btn mint sm" data-act="hire" data-id="${c.id}" ${maxed || s.money < c.cost ? 'disabled' : ''}>Rekrut<br><small>${fmtMoney(c.cost)}</small></button></div></div>`;
     }
     return { html, sig };
@@ -208,7 +225,7 @@ export class UI {
   // ----- Tab Toko -----
   shopView() {
     const g = this.g, s = g.s;
-    const tot = g.totalDesks(), nxD = tot < 9 ? { cost: DESK_COSTS[tot], lvl: DESK_LEVELS[tot] } : null;
+    const tot = g.totalDesks(), nxD = tot < 27 ? { cost: DESK_COSTS[tot], lvl: DESK_LEVELS[tot] } : null;
     const sig = 'S' + this.focus + s.level + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
     let html = `<div class="sec-title"><span>Fasilitas</span></div>`;
     for (const [k, F] of Object.entries(FACILITIES)) {
@@ -264,15 +281,18 @@ export class UI {
       case 'approve': g.resolveRequest(id, 'approve', k); break;
       case 'reject': g.resolveRequest(id, 'reject'); break;
       case 'memo': sfx('tap'); this.showMemoDialog(id, k); return;
+      case 'approvemg': sfx('tap'); this.runRequestMinigame(id, k); return;
+      case 'kickoff': sfx('tap'); this.showKickoffDialog(id); return;
       case 'assign': sfx('tap'); this.showAssign(id); return;
       case 'unassign': g.unassign(id); sfx('tap'); break;
       case 'claim': g.claimTask(id, true); break;
-      case 'brk': { const em = g.emp(id); if (em && g.requestActivity(em, k, true)) { sfx('pop'); g.toast(`${em.name}: ${({ coffee: 'ngopi ☕', ps: 'main PS 🎮', play: 'main di taman 🛝', nap: 'tidur sebentar 😴' })[k]}`, 'info'); } break; }
+      case 'brk': { const em = g.emp(id); if (em && g.requestActivity(em, k, true)) { sfx('pop'); g.toast(`${em.name}: ${({ coffee: 'ngopi ☕', ps: 'main PS 🎮', play: 'main di taman 🛝', pool: 'berenang 🏊', nap: 'tidur sebentar 😴' })[k]}`, 'info'); } break; }
       case 'bonus': g.giveBonus(id); break;
       case 'train': g.train(id); break;
       case 'hire': sfx('tap'); this.showNameDialog(id, false); return;
       case 'rename': sfx('tap'); this.showNameDialog(id, true); return;
       case 'fire': sfx('tap'); this.showFireDialog(id); return;
+      case 'summon': sfx('tap'); this.showSummonDialog(id); return;
       case 'reroll': g.rerollCandidates(); break;
       case 'buyfac': g.buyFacility(k); break;
       case 'buydesk': g.buyDesk(k); break;
@@ -293,7 +313,7 @@ export class UI {
     if (h.type === 'desk') { sfx('tap'); this.openTab('shop', 'desk:' + h.dept); return; }
     if (h.type === 'room') {
       sfx('tap');
-      if (h.kind === 'inbox') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
+      if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
     }
   }
 
@@ -323,13 +343,14 @@ export class UI {
     $('#dotTeam').classList.toggle('on', s.candidates.some(c => g.freeDesk(c.spec) >= 0 && s.money >= c.cost));
     $('#dotShop').classList.toggle('on', Object.keys(FACILITIES).some(k => { const n = g.nextFac(k); return n && s.level >= n.lvl && s.money >= n.cost && (s.fac[k] === 0); }));
     const lg = s.log.slice(0, 7).join('|'); if (this.lastLog !== lg) { this.lastLog = lg; $('#sideLog').innerHTML = `<h3>📖 Jurnal kantor</h3>${s.log.slice(0, 7).map(l => `<div>${esc(l)}</div>`).join('')}`; }
-    $('#dotInbox').classList.toggle('on', s.inbox.length > 0);
+    $('#dotInbox').classList.toggle('on', s.inbox.length > 0 || (s.projects || []).some(p => p.state === 'plan'));
     $('#dotMissions').classList.toggle('on', Object.values(s.missions).some(x => x.done && !x.claimed));
   }
 
   // ---------- Petunjuk ----------
   computeHint() {
     const g = this.g, s = g.s;
+    if ((s.projects || []).some(p => p.state === 'plan')) return ['📋', 'Proyek baru menunggu! Adakan rapat kick-off di tab Inbox agar tiket proyek mulai.'];
     if (s.inbox.length) return ['📥', `Ada ${s.inbox.length} permintaan menunggu persetujuanmu di tab Inbox!`];
     if (!s.stat.assigned && s.tasks.some(t => t.state === 'new')) return ['📋', 'Tap 📋 Tugas, pilih tiket, lalu "Tugaskan" ke karyawan ya!'];
     const idle = s.employees.find(e => !e.task && e.st === 'idle');
@@ -387,8 +408,8 @@ export class UI {
   showNameDialog(id, isRename) {
     const g = this.g, c = isRename ? g.emp(id) : g.s.candidates.find(x => x.id === id); if (!c) return;
     const sp = SPECS[c.spec], R = RARITY[c.rarity], tr = TRAITS[c.trait];
-    const need = !isRename && g.freeDesk(c.spec) < 0, dept = deptOfSpec(c.spec), maxed = need && g.s.deskCount[dept] >= 3, deskCost = DESK_COSTS[g.totalDesks()] || 0;
-    const note = need ? (maxed ? `<div class="res bad" style="font-size:12px">Departemen ${DEPTS[dept].name} sudah penuh (3 meja). Pecat salah satu karyawan dulu untuk merekrut.</div>` : `<div class="res" style="font-size:12px;border-color:#ffd84d">🪑 Meja ${DEPTS[dept].name} penuh. Kantor akan diperluas: beli meja baru ${fmtMoney(deskCost)} sekaligus rekrut.</div>`) : '';
+    const need = !isRename && g.freeDesk(c.spec) < 0, dept = deptOfSpec(c.spec), maxed = need && g.s.deskCount[dept] >= DESK_MAX, deskCost = DESK_COSTS[g.totalDesks()] || 0;
+    const note = need ? (maxed ? `<div class="res bad" style="font-size:12px">Departemen ${DEPTS[dept].name} sudah penuh (${DESK_MAX} meja). Pecat salah satu karyawan dulu untuk merekrut.</div>` : `<div class="res" style="font-size:12px;border-color:#ffd84d">🪑 Meja ${DEPTS[dept].name} penuh. Kantor akan diperluas: beli meja baru ${fmtMoney(deskCost)} sekaligus rekrut.</div>`) : '';
     const root = this.openModal(`<div class="av" style="--rc:${R.color};width:84px;height:84px;margin:0 auto"><img src="${portrait(c.look, c.spec, 'happy', 84)}" alt=""></div>
       <h2>${isRename ? 'Ganti nama' : 'Rekrut karyawan baru'}</h2>
       <p>${sp.emoji} ${sp.name} · ${tr.emoji} ${tr.name} · 💪 Skill ${c.skill}${isRename ? '' : `<br>Biaya rekrut ${fmtMoney(c.cost)} · gaji ${fmtMoney(c.salary)}/hari`}</p>
@@ -431,9 +452,24 @@ export class UI {
     root.querySelectorAll('[data-tpl]').forEach(b => b.addEventListener('click', () => { sfx('pop'); txt.value = tpls[+b.dataset.tpl]; upd(); }));
     root.querySelector('#mSend').addEventListener('click', () => {
       const ok = g.resolveRequest(reqId, 'approve', optKey, { to: root.querySelector('#mTo').value, subject: root.querySelector('#mSub').value, text: txt.value });
-      if (ok) { this.closeModal(); this.render(true); this.hud(true); }
+      if (ok) { this.closeModal(); this.render(true); this.hud(true); if (r.type === 'project') setTimeout(() => { const p = g.s.projects[g.s.projects.length - 1]; if (p && p.state === 'plan') this.showKickoffDialog(p.id); }, 120); }
     });
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
+  }
+
+  showSummonDialog(id) {
+    const g = this.g, e = g.emp(id); if (!e) return;
+    const root = this.openModal(`<div class="av" style="--rc:${RARITY[e.rarity].color};width:84px;height:84px;margin:0 auto"><img src="${portrait(e.look, e.spec, 'stress', 84)}" alt=""></div>
+      <h2>Panggil ${esc(e.name)}</h2><p>${SPECS[e.spec].emoji} ${SPECS[e.spec].name} · ⚡${Math.round(e.energy)} · 😣${Math.round(e.stress)} · 💚${Math.round(e.mood)}<br>Dia akan berjalan ke ruang Kepala Divisi. Pilih gayamu:</p>
+      <div class="choices"><button class="choice" data-m="marah">😡 Marah-marah<small>Stres +, mood − (tim yang melihat jadi takut). Dia jadi terpacu 45 dtk. Bisa resign kalau mood sudah rendah!</small></button>
+      <button class="choice" data-m="tegur">😐 Tegur halus<small>Stres naik sedikit, jadi fokus sementara. Aman.</small></button>
+      <button class="choice" data-m="semangat">🤗 Beri semangat<small>Mood naik, stres turun, dan bersemangat sementara.</small></button></div>
+      <button class="btn ghost block" style="margin-top:10px" data-close>Batal</button>`);
+    root.addEventListener('click', ev => {
+      if (ev.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); return; }
+      const b = ev.target.closest('.choice'); if (!b) return;
+      if (g.summon(id, b.dataset.m)) { this.closeModal(); this.scene.focusGrid(19, 4, 1.15); this.render(true); this.hud(true); }
+    });
   }
 
   showFireDialog(id) {
@@ -446,6 +482,34 @@ export class UI {
       <button class="btn block" id="okFire" style="background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e" ${g.s.money < cost ? 'disabled' : ''}>🚪 Ya, pecat</button><button class="btn ghost block" style="margin-top:8px" data-close>Batal</button>`);
     root.querySelector('#okFire').addEventListener('click', () => { g.fire(id); this.closeModal(); this.render(true); this.hud(true); });
     root.addEventListener('click', e2 => { if (e2.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
+  }
+
+  // Dialog rapat kick-off proyek: pilih peserta & fokus proyek → peserta berkumpul di Ruang Meeting
+  showKickoffDialog(pid) {
+    const g = this.g, s = g.s, p = (s.projects || []).find(x => x.id === pid); if (!p) return;
+    const crew = s.employees.filter(e => !e.leaving && e.st !== 'sick'), sel = new Set();
+    const root = this.openModal(`<div class="big-emoji">📋</div><h2>Rapat Kick-off</h2><p>${esc(p.name)}<br>Pilih 2–6 peserta. Semakin lengkap perwakilan departemen & semakin tinggi skill, semakin bagus hasil proyek.</p>
+      <div class="sec-title" style="justify-content:center">Peserta (<span id="kCnt">0</span>/6)</div>
+      <div class="sel-list" style="max-height:34dvh;overflow:auto">${crew.map(e => `<button class="sel-item" data-id="${e.id}"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'smile', 40)}" alt=""></div><div class="grow" style="text-align:left"><div class="t-title">${esc(e.name)}</div><div class="t-sub">${SPECS[e.spec].name} · ${DEPTS[deptOfSpec(e.spec)].name} · 💪${e.skill}</div></div><span class="chip" data-mark>＋</span></button>`).join('')}</div>
+      <div class="sec-title" style="justify-content:center">Fokus proyek</div>
+      <div class="choices"><button class="choice" data-sc="fast">⚡ Ngebut<small>Hadiah +30%, tenggat 4 hari, risiko +3</small></button><button class="choice" data-sc="balanced" style="border-color:#2fb36d">⚖️ Seimbang<small>Hadiah normal, tenggat 6 hari</small></button><button class="choice" data-sc="safe">🛡️ Aman<small>Hadiah −8%, tenggat 8 hari, risiko turun</small></button></div>
+      <button class="btn block" id="kGo" style="margin-top:10px" disabled>Mulai Rapat 📋</button><button class="btn ghost block" style="margin-top:8px" data-close>Batal</button>`);
+    let scope = 'balanced';
+    const upd = () => { root.querySelector('#kCnt').textContent = sel.size; root.querySelector('#kGo').disabled = sel.size < 2; };
+    root.querySelectorAll('.sel-item').forEach(b => b.addEventListener('click', () => { sfx('tap'); const id = b.dataset.id; if (sel.has(id)) sel.delete(id); else if (sel.size < 6) sel.add(id); else return; b.style.borderColor = sel.has(id) ? '#2fb36d' : ''; b.querySelector('[data-mark]').textContent = sel.has(id) ? '✔' : '＋'; upd(); }));
+    root.querySelectorAll('[data-sc]').forEach(b => b.addEventListener('click', () => { sfx('tap'); scope = b.dataset.sc; root.querySelectorAll('[data-sc]').forEach(x => { x.style.borderColor = x === b ? '#2fb36d' : ''; }); }));
+    root.querySelector('#kGo').addEventListener('click', () => { if (g.startKickoff(pid, [...sel], scope)) { this.closeModal(); this.scene.focusGrid(18.6, 12.8, 1.0); this.render(true); this.hud(true); } });
+    root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
+  }
+
+  // Mini-game untuk opsi permintaan (mis. perbaiki bug kritis saat UAT proyek)
+  runRequestMinigame(reqId, optKey) {
+    const g = this.g, r = g.s.inbox.find(x => x.id === reqId); if (!r) return;
+    const root = this.openModal('<div id="mgHost"></div>');
+    playPatchRush(root.querySelector('#mgHost'), { title: r.title }).then(res => {
+      if (res.tier >= 1) g.s.stat.mgWins++;
+      this.closeModal(); g.resolveRequest(reqId, 'approve', optKey, null, { tier: res.tier }); this.render(true); this.hud(true);
+    });
   }
 
   showAssign(taskId) {
