@@ -33,12 +33,13 @@ export class Scene {
   }
 
   // ---------- Kamera ----------
+  setQuality(q) { this.quality = q; this.resize(); }
   setInset(i) { this.inset = i; this.resize(); }
   get area() { const i = this.inset; return { x: i.l, y: i.t, w: Math.max(100, this.vw - i.l - i.r), h: Math.max(100, this.vh - i.t - i.b) }; }
   minZoom() { const a = this.area; return Math.min(a.w / (WORLD_W + 20), a.h / (WORLD_H + 10)); }
   resize() {
     const p = this.cv.parentElement; this.vw = p.clientWidth; this.vh = p.clientHeight;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2) * (this.quality || 1);
     this.cv.style.width = this.vw + 'px'; this.cv.style.height = this.vh + 'px';
     this.cv.width = Math.round(this.vw * this.dpr); this.cv.height = Math.round(this.vh * this.dpr);
     const a = this.area, fit = this.minZoom();
@@ -292,6 +293,7 @@ export class Scene {
       case 'act': {
         const k = e.act && e.act.kind;
         if (k === 'coffee') { pose = 'drink'; held = 'cup'; face = 'happy'; }
+        else if (k === 'gossip') { pose = 'stand'; face = 'happy'; }
         else if (k === 'snack') { pose = 'drink'; held = 'snack'; face = 'happy'; }
         else if (k === 'ps') { pose = 'game'; held = 'pad'; face = 'excited'; }
         else if (k === 'play') { pose = s.fac.play === 1 ? 'ball' : 'bounce'; face = 'happy'; }

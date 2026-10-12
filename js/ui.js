@@ -1,5 +1,5 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
+import { QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
@@ -88,8 +88,8 @@ export class UI {
     const g = this.g;
     switch (e.st) {
       case 'sick': return e.hidden ? '🏖️ Sedang cuti (di luar kantor)' : '😵 Burnout — sedang pulih';
-      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
-      case 'act': return ({ coffee: '☕ Sedang ngopi', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
+      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', gossip: '🗣️ Bergosip (kerja tersendat)', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
+      case 'act': return ({ coffee: '☕ Sedang ngopi', gossip: '🗣️ Bergosip', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
       case 'queue': return '⏳ Antri fasilitas';
       case 'walk': if (e.onLeave) return '🚪 Berjalan ke pintu (cuti)'; if (e.leaving) return '🚪 Meninggalkan kantor'; return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
       case 'work': { const t = g.task(e.task); return `💼 ${t ? t.title : 'Bekerja'}`; }
@@ -191,10 +191,12 @@ export class UI {
     const g = this.g, s = g.s, sp = SPECS[e.spec], R = RARITY[e.rarity], tr = TRAITS[e.trait];
     const btn = (k, ico, lbl) => `<button class="btn lav" data-act="brk" data-k="${k}" data-id="${e.id}" ${(k !== 'nap' && !s.fac[k]) || e.st === 'sick' ? 'disabled' : ''} title="${lbl}">${ico}</button>`;
     const tc = g.trainCost(e);
-    return `<div class="card ${this.focus === e.id ? 'focus' : ''}" id="emp-${e.id}">
+    const D = DEPTS[deptOfSpec(e.spec)], pl = g.perfLevel(e), q = e.quirk && QUIRKS[e.quirk];
+    const perf = { good: ['#2fae6a', '🟢 Kinerja baik'], warn: ['#d99a00', '🟡 Perlu perhatian'], bad: ['#e5484d', '🔴 Kinerja buruk'] }[pl];
+    return `<div class="card ${this.focus === e.id ? 'focus' : ''}" id="emp-${e.id}" style="border-left:7px solid ${D.color}">
       <div class="row"><div class="av" style="--rc:${R.color}"><img src="${portrait(e.look, e.spec, 'smile', 72)}" alt=""><span class="rar">${R.name}</span></div>
         <div class="grow"><div class="t-title">${esc(e.name)} <span class="chip">Lv.${e.lvl}</span>${e.sp ? ` <span class="chip late">SP${e.sp}</span>` : ''}</div>
-          <div class="t-sub">${sp.emoji} ${sp.name}</div>${(() => { const sg = g.suggestFor(e); return sg ? `<button class="btn sm ${sg.kind === 'fire' ? '' : 'gold'}" data-act="sugg" data-k="${sg.kind}" data-id="${e.id}" style="margin:5px 0 2px;${sg.kind === 'fire' ? 'background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e;' : ''}">💡 Saran: ${sg.kind === 'fire' ? '🚪 Pecat' : '📄 Beri Surat Peringatan'} <small>(${sg.why})</small></button>` : ''; })()}
+          <div class="t-sub"><span class="chip" style="background:${D.color}44;color:#1f3a2e;font-weight:900">${D.emoji} ${D.name}</span> ${sp.emoji} ${sp.name}</div><div class="chips" style="margin-top:4px"><span class="chip" style="color:${perf[0]};font-weight:900">${perf[1]}</span>${q ? `<span class="chip late" title="${q.desc}">${q.emoji} ${q.name}</span>` : ''}</div>${(() => { const sg = g.suggestFor(e); return sg ? `<button class="btn sm ${sg.kind === 'fire' ? '' : 'gold'}" data-act="sugg" data-k="${sg.kind}" data-id="${e.id}" style="margin:5px 0 2px;${sg.kind === 'fire' ? 'background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e;' : ''}">💡 Saran: ${sg.kind === 'fire' ? '🚪 Pecat' : '📄 Beri Surat Peringatan'} <small>(${sg.why})</small></button>` : ''; })()}
           <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 Skill ${e.skill}</span><span class="chip">💸 ${fmtMoney(e.salary)}/hari</span></div></div></div>
       <div class="t-sub" style="margin-top:6px">${tr.desc}</div>
       <div class="bars">
@@ -208,16 +210,22 @@ export class UI {
   }
   teamView() {
     const g = this.g, s = g.s, crew = s.employees.filter(e => !e.leaving);
-    const sig = 'M' + this.focus + crew.map(e => e.id + (e.suggK || '') + (e.sp || 0) + (e.hidden ? 'h' : '') + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.snack ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
+    const sig = 'M' + this.focus + crew.map(e => e.id + (e.suggK || '') + Math.floor(e.fails || 0) + (e.quirk || '') + (e.sp || 0) + (e.hidden ? 'h' : '') + e.lvl + e.skill + (s.fac.coffee ? 1 : 0) + (s.fac.snack ? 1 : 0) + (s.fac.ps ? 1 : 0) + (s.fac.play ? 1 : 0) + (s.money < 1 ? 0 : 1) + (s.money < g.trainCost(e) ? 0 : 1) + (e.st === 'sick' ? 's' : '')).join(',') + '|' + s.candidates.map(c => c.id + (s.money >= c.cost ? 1 : 0) + (g.freeDesk(c.spec) < 0 ? 'f' : '')).join(',') + g.totalDesks() + (s.money >= 1.5 ? 'r' : '');
     let html = `<div class="sec-title"><span>Tim kamu (${crew.length}/${g.totalDesks()} meja)</span></div>`;
     if (!crew.length) html += `<div class="empty"><span class="big">🪑</span>Belum ada karyawan.</div>`;
-    html += crew.map(e => this.empCard(e)).join('');
+    const flagged = crew.filter(e => g.suggestFor(e));
+    if (flagged.length) html += `<div class="card" style="border:2px solid #e5484d;background:#fff6f6"><div class="t-title">💡 Saran sistem untuk Kepala Divisi</div>${flagged.map(e => { const sg = g.suggestFor(e); return `<div class="t-sub" style="margin-top:4px"><b>${esc(e.name)}</b> (${DEPTS[deptOfSpec(e.spec)].name}) → ${sg.kind === 'fire' ? '🚪 disarankan <b>dipecat</b>' : '📄 disarankan <b>Surat Peringatan</b>'} · ${sg.why}</div>`; }).join('')}</div>`;
+    for (const dk of DEPT_KEYS) {
+      const list = crew.filter(e => deptOfSpec(e.spec) === dk); if (!list.length) continue;
+      const D = DEPTS[dk];
+      html += `<div class="sec-title" style="border-left:6px solid ${D.color};padding-left:8px"><span>${D.emoji} ${D.name} (${list.length}/${s.deskCount[dk]} meja)</span></div>` + list.map(e => this.empCard(e)).join('');
+    }
     html += `<div class="sec-title"><span>🌿 Calon karyawan (baru tiap hari)</span><button class="btn ghost sm" data-act="reroll" ${s.money < 1.5 ? 'disabled' : ''}>🔄 Cari lagi · Rp 1,5 jt</button></div>`;
     for (const c of s.candidates) {
       const sp = SPECS[c.spec], R = RARITY[c.rarity], tr = TRAITS[c.trait], full = g.freeDesk(c.spec) < 0, maxed = full && s.deskCount[deptOfSpec(c.spec)] >= DESK_MAX;
       html += `<div class="card"><div class="row"><div class="av" style="--rc:${R.color}"><img src="${portrait(c.look, c.spec, 'happy', 72)}" alt=""><span class="rar">${R.name}</span></div>
         <div class="grow"><div class="t-title">${esc(c.name)} <span class="chip" style="background:${R.color}33;color:${R.color}">${R.label}</span></div><div class="t-sub">${sp.emoji} ${sp.name} · ${DEPTS[deptOfSpec(c.spec)].name}</div>
-        <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 ${c.skill}</span>${full ? `<span class="chip late">🪑 ${maxed ? `departemen penuh (${DESK_MAX}/${DESK_MAX})` : 'butuh meja'}</span>` : ''}<span class="chip">💸 ${fmtMoney(c.salary)}/hari</span></div></div>
+        <div class="chips"><span class="chip">${tr.emoji} ${tr.name}</span><span class="chip xp">💪 ${c.skill}</span>${c.quirk ? `<span class="chip late" title="${QUIRKS[c.quirk].desc}">${QUIRKS[c.quirk].emoji} ${QUIRKS[c.quirk].name}</span>` : ''}${full ? `<span class="chip late">🪑 ${maxed ? `departemen penuh (${DESK_MAX}/${DESK_MAX})` : 'butuh meja'}</span>` : ''}<span class="chip">💸 ${fmtMoney(c.salary)}/hari</span></div></div>
         <button class="btn mint sm" data-act="hire" data-id="${c.id}" ${maxed || s.money < c.cost ? 'disabled' : ''}>Rekrut<br><small>${fmtMoney(c.cost)}</small></button></div></div>`;
     }
     return { html, sig };
@@ -342,7 +350,7 @@ export class UI {
     // titik notifikasi
     const idle = s.employees.some(e => !e.task && e.st !== 'sick') && s.tasks.some(t => t.state === 'new');
     $('#dotTasks').classList.toggle('on', idle || s.tasks.some(t => t.state === 'done'));
-    $('#dotTeam').classList.toggle('on', s.candidates.some(c => g.freeDesk(c.spec) >= 0 && s.money >= c.cost));
+    $('#dotTeam').classList.toggle('on', s.employees.some(e => e.suggK) || s.candidates.some(c => g.freeDesk(c.spec) >= 0 && s.money >= c.cost));
     $('#dotShop').classList.toggle('on', Object.keys(FACILITIES).some(k => { const n = g.nextFac(k); return n && s.level >= n.lvl && s.money >= n.cost && (s.fac[k] === 0); }));
     const lg = s.log.slice(0, 7).join('|'); if (this.lastLog !== lg) { this.lastLog = lg; $('#sideLog').innerHTML = `<h3>📖 Jurnal kantor</h3>${s.log.slice(0, 7).map(l => `<div>${esc(l)}</div>`).join('')}`; }
     $('#dotInbox').classList.toggle('on', s.inbox.length > 0 || (s.projects || []).some(p => p.state === 'plan'));

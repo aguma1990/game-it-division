@@ -35,9 +35,21 @@ function begin(opts) {
   requestAnimationFrame(loop);
 }
 
-let last = performance.now();
+// Performa: resolusi kanvas menyesuaikan otomatis bila perangkat lambat; saat jeda/dialog digambar setengah frame
+let last = performance.now(), ema = 16, nFrames = 0, skip = false;
 function loop(now) {
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const idle = game.blocking || (game.s && game.s.speed === 0);
+  if (idle) { skip = !skip; if (skip) { requestAnimationFrame(loop); return; } }
+  const raw = now - last;
+  if (!idle && raw < 200) {
+    ema = ema * 0.94 + raw * 0.06;
+    if (++nFrames % 90 === 0) {
+      const q = scene.quality || 1;
+      if (ema > 27 && q > 0.55) scene.setQuality(Math.max(0.55, q - 0.2));
+      else if (ema < 18.5 && q < 1 && nFrames % 540 === 0) scene.setQuality(Math.min(1, q + 0.15));
+    }
+  }
+  const dt = Math.min(0.1, raw / 1000); last = now;
   game.update(dt); scene.frame(dt); scene.draw(); ui.tick(dt);
   if (dirty && now - lastSave > 6000) hooks.save();
   requestAnimationFrame(loop);

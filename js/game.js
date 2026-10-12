@@ -1,7 +1,7 @@
 // Logika game (tanpa DOM): waktu, karyawan, tiket, fasilitas, ekonomi, misi.
 import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
-  HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
+  HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
   fmtMoney
 } from './data.js';
 import { EVENTS } from './events.js';
@@ -28,7 +28,7 @@ export const PLAY_SLOTS = [[12.4, 11.6], [14.0, 11.6], [12.4, 13.0], [14.0, 13.0
 export const ENTRY = { x: 6.6, y: 0.3 };            // pintu masuk/keluar di dinding belakang (ujung lorong tegak)
 export const DIR_SEAT = { x: 18.7, y: 2.9 };
 const HOURS_PER_SEC = 1 / 4.2;   // 4,2 detik nyata = 1 jam game (1x) → 1 hari ≈ 38 detik
-const ACT_DUR = { coffee: 3.6, snack: 4.2, ps: 10, play: 8, pool: 9, summon: 9 };
+const ACT_DUR = { gossip: 8, coffee: 3.6, snack: 4.2, ps: 10, play: 8, pool: 9, summon: 9 };
 export const SCOLD_SPOT = { x: 19.3, y: 4.7 };
 const SCOLD_LINES = {
   sp: ['Ini Surat Peringatan resmi untukmu.', 'Kinerjamu perlu diperbaiki segera.', 'Tolong baca & tanda tangani ya.', 'Kesempatan terakhir sebelum sanksi lanjut.'],
@@ -104,7 +104,7 @@ export function makeEmployee(spec, rarity, usedNames = [], forceFemale) {
   do { name = `${pick(female ? NAMES_F : NAMES_M)} ${pick(SURNAMES)}`; } while (usedNames.includes(name) && tries++ < 20);
   const R = RARITY[rarity];
   return {
-    id: nid('E'), name, female, spec, rarity, trait: pick(TRAIT_KEYS), look: genLook(female),
+    id: nid('E'), name, female, spec, rarity, trait: pick(TRAIT_KEYS), quirk: rollQuirk(), look: genLook(female),
     skill: ri(R.skill[0], R.skill[1]), lvl: 1, xp: 0, energy: ri(80, 100), stress: ri(5, 18), mood: ri(78, 92),
     salary: r1(R.salary * rnd(0.9, 1.15)), task: null, desk: 0, tasksDone: 0, wTasks: 0
   };
@@ -147,6 +147,7 @@ export class Game {
     this.s.deskV = 3; if (!this.s.projects) this.s.projects = []; this.s.projects.forEach(p => { if (p.state === 'meeting') p.state = 'plan'; });
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
     if (this.s.starterDone === undefined) this.s.starterDone = true;
+    for (const e of this.s.employees) if (e.quirk === undefined) e.quirk = rollQuirk();
     for (const k of ['approved', 'rejected', 'memos']) if (this.s.stat[k] === undefined) this.s.stat[k] = 0;
     if (!this.s.inbox) this.s.inbox = []; if (!this.s.memos) this.s.memos = []; if (this.s.coffeeStock === undefined) this.s.coffeeStock = 30; if (this.s.snackStock === undefined) this.s.snackStock = 24; if (this.s.fac.snack === undefined) this.s.fac.snack = 0; if (this.s.firstReq === undefined) this.s.firstReq = true;
     const d = { auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false };
@@ -254,7 +255,8 @@ export class Game {
     const T = e.trait, base = (e.skill / 55) * 2.0 * (1 + (e.lvl - 1) * 0.05);
     const energyF = 0.45 + 0.55 * e.energy / 100, moodF = 0.65 + 0.35 * e.mood / 100;
     const stressF = e.stress > 70 ? 1 - 0.5 * (e.stress - 70) / 30 : 1;
-    return base * (e.broken ? 0.5 : 1) * (e.deviceBonus || 1) * this.matchFactor(e, t) * energyF * moodF * stressF * (e.buff > 0 ? 1.2 : 1) * (T === 'rajin' ? 1.1 : 1) * (T === 'santai' ? 0.95 : 1);
+    return base * (e.broken ? 0.5 : 1) * (e.deviceBonus || 1) * this.matchFactor(e, t) * energyF * moodF * stressF * (e.buff > 0 ? 1.2 : 1) * (T === 'rajin' ? 1.1 : 1) * (T === 'santai' ? 0.95 : 1)
+      * (e.quirk === 'lambat' ? 0.75 : 1) * (this.s.employees.some(x => x.act && x.act.kind === 'gossip' && x.act.arrived && x.act.mate === e.id) ? 0.5 : 1);
   }
 
   assign(taskId, empId) {
@@ -281,7 +283,7 @@ export class Game {
   finishTask(t, e) {
     const q = (e.mood >= 70 && e.stress < 62 && Math.random() < (e.trait === 'teliti' ? 0.9 : 0.5)) ? 'perfect' : (e.stress >= 85 && e.trait !== 'teliti' && Math.random() < 0.4 ? 'bug' : 'ok');
     t.state = 'done'; t.progress = t.work; t.q = q; t.claimT = 9; t.doneBy = e.id;
-    e.fails = q === 'bug' ? (e.fails || 0) + 1 : Math.max(0, (e.fails || 0) - 0.5); this.checkSuggest();
+    e.fails = q === 'bug' ? (e.fails || 0) + 1 : e.quirk === 'lambat' && q !== 'perfect' ? (e.fails || 0) + 0.6 : Math.max(0, (e.fails || 0) - 0.5); this.checkSuggest();
     e.task = null; e.tasksDone++; e.wTasks++;
     this.releaseWork(e);
     e.claimBubble = t.id;
@@ -411,6 +413,7 @@ export class Game {
       if (s.snackStock <= 4 && s.fac.snack && !s.inbox.some(r => r.type === 'snack')) this.genRequest('snack');
       this.say(e, pick(['Nyam nyam! 🍪', 'Enak~', 'Kulkasnya top!', 'Isi tenaga 🍫']), 2.5); this.face(e, 'happy', 3);
       this.emit('popup', { empId: e.id, text: '🍪 Yummy!', kind: 'energy' });
+    } else if (a.kind === 'gossip') { e.fails = (e.fails || 0) + 0.5; s.stat.gossips = (s.stat.gossips || 0) + 1; this.say(e, 'Eh, balik kerja deh… 😅', 2.5); this.checkSuggest();
     } else if (a.kind === 'ps') { s.stat.psPlays++; this.say(e, pick(['Seru banget!', 'Menang! 🏆', 'Stres hilang~'])); this.face(e, 'happy', 3); }
     else if (a.kind === 'pool') { s.stat.poolSwims = (s.stat.poolSwims || 0) + 1; this.say(e, pick(['Segarnya! 💦', 'Byurr~ 🏊', 'Stres larut di air…'])); this.face(e, 'happy', 3); }
     else if (a.kind === 'play') { s.stat.playPlays++; this.say(e, pick(['Hepi hepi! 🌈', 'Capek tapi senang~'])); this.face(e, 'happy', 3); }
@@ -456,6 +459,7 @@ export class Game {
     e.cool = Math.max(0, e.cool - dt); e.buff = Math.max(0, e.buff - dt);
     if (e.sayT > 0) { e.sayT -= dt; if (e.sayT <= 0) e.say = null; }
     if (e.faceT > 0) { e.faceT -= dt; if (e.faceT <= 0) e.face = null; }
+    if (e.quirk === 'gosip' && (e.st === 'work' || e.st === 'idle') && !e.act && !this.blocking) { e.gT = (e.gT === undefined ? rnd(12, 35) : e.gT) - dt; if (e.gT <= 0) { e.gT = rnd(35, 75); this.startGossip(e); } }
     // dekorasi menambah mood
     if (e.mood < 92) e.mood += this.decorCount() * 0.03 * dt;
 
@@ -529,6 +533,8 @@ export class Game {
       const r = (l ? l.rate : 1) * (e.trait === 'gamer' ? 1.5 : 1) * co;
       e.stress = clamp(e.stress - 3.2 * r * dt); e.mood = clamp(e.mood + 1.9 * r * dt * (e.trait === 'ceria' ? 1.3 : 1)); e.energy = clamp(e.energy - 0.25 * dt);
       if (Math.random() < 0.006 && !e.say) this.say(e, pick(['Yosh!', 'Awas awas!', 'Kena kamu~', 'Combo! 🔥']), 2);
+    } else if (a.kind === 'gossip') {
+      if (a.arrived) { a.lt -= dt; if (a.lt <= 0) { a.lt = rnd(1.6, 2.8); const m = this.emp(a.mate); this.say(e, pick(['Katanya Bos mau…🤫', 'Masa sih?! 😲', 'Psst psst 🗣️', 'Eh tau nggak…', 'Serius?! hihi']), 2); if (m && !m.say) this.say(m, pick(['Hah? Beneran? 😮', 'Hmm iya sih…', 'Ssst, ada Bos!']), 1.8); } e.mood = clamp(e.mood + 0.6 * dt); }
     } else if (a.kind === 'summon') { this.tickSummon(e, dt);
     } else if (a.kind === 'pool') {
       const l = this.facInfo('pool'), r = (l ? l.rate : 1) * (e.trait === 'santai' ? 1.3 : 1);
@@ -697,7 +703,7 @@ export class Game {
     if (!e || e.leaving) return null;
     const f = e.fails || 0, sp = e.sp || 0;
     if (sp >= 3 || (sp >= 2 && f >= 1)) return { kind: 'fire', why: sp >= 3 ? 'sudah menerima SP 3×' : 'SP 2× dan kinerja masih buruk' };
-    if (f >= 2) return { kind: 'sp', why: 'sering telat / banyak bug' };
+    if (f >= 2) return { kind: 'sp', why: e.quirk === 'gosip' ? 'suka bergosip & kerja tersendat' : e.quirk === 'lambat' ? 'lambat kerja' : 'sering telat / banyak bug' };
     return null;
   }
   checkSuggest() {
@@ -706,6 +712,15 @@ export class Game {
       const sg = this.suggestFor(e), k = sg ? sg.kind : '';
       if ((e.suggK || '') !== k) { e.suggK = k; if (k) { this.toast(`💡 Saran: ${e.name} ${k === 'fire' ? 'sebaiknya dipecat' : 'perlu Surat Peringatan'} (${sg.why})`, 'warn'); this.emit('sfx', 'alert'); this.emit('change'); } }
     }
+  }
+  perfLevel(e) { const f = e.fails || 0, sp = e.sp || 0; return f >= 2 || sp >= 2 ? 'bad' : f >= 1 || sp >= 1 || e.quirk ? 'warn' : 'good'; }
+  // Perilaku: staf suka gosip meninggalkan meja & menghampiri rekan
+  startGossip(e) {
+    const mates = this.s.employees.filter(x => x !== e && !x.leaving && !x.hidden && !x.onLeave && (x.st === 'work' || x.st === 'idle') && !x.act);
+    if (!mates.length) return false;
+    const m = pick(mates); this.cancelActivity(e); this.releaseWork(e);
+    e.act = { kind: 'gossip', t: 0, dur: ACT_DUR.gossip, arrived: false, mate: m.id, lt: 0 };
+    const d = deskPos(m.desk); this.setPath(e, d.x + 0.8, d.y + 0.1, 'act'); this.say(e, 'Eh eh, sini deh… 🤫', 2.5); return true;
   }
   fireCost(e) { return r1(e.salary * 3); }
   fire(id) {

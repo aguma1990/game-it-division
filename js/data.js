@@ -25,6 +25,12 @@ export const TRAITS = {
   kucing: { name: 'Pecinta Kucing',   emoji: '🐱', desc: 'Main bareng Mochi & di taman bermain = bahagia.' },
   begadang: { name: 'Anak Begadang',  emoji: '🌙', desc: 'Energi terkuras lebih lambat.' }
 };
+// Kebiasaan buruk (tidak semua karyawan punya): memengaruhi kinerja
+export const QUIRKS = {
+  lambat: { name: 'Lambat Kerja', emoji: '🐌', desc: 'Mengerjakan tiket 25% lebih lambat dari seharusnya.' },
+  gosip:  { name: 'Suka Gosip',   emoji: '🗣️', desc: 'Sering menghampiri rekan untuk ngobrol & bergosip, bikin kerja tersendat.' }
+};
+export const rollQuirk = () => { const r = Math.random(); return r < 0.14 ? 'lambat' : r < 0.28 ? 'gosip' : null; };
 export const TRAIT_KEYS = Object.keys(TRAITS);
 
 export const RARITY = {
