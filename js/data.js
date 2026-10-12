@@ -2,8 +2,8 @@
 
 // Dunia isometrik: grid 16 x 15 petak, petak 64x32 px
 export const GW = 28, GH = 22, TW = 64, TH = 32;
-export const OX = 933, OY = 172;            // posisi piksel petak (0,0)
-export const WORLD_W = 2020, WORLD_H = 1190;
+export const OX = 933, OY = 212;            // posisi piksel petak (0,0)
+export const WORLD_W = 2020, WORLD_H = 1230;
 
 export const SPECS = {
   dev:  { name: 'Developer',        dept: 'Pengembangan Sistem',         emoji: '💻', color: '#8f8cf2', dark: '#6a67d6' },
@@ -98,7 +98,16 @@ export const FACILITIES = {
     name: 'Kulkas & Snack', emoji: '🧊', room: 'Pantry',
     levels: [
       { name: 'Kulkas Mini', cost: 10, lvl: 2, slots: 2, mood: 6, energy: 10, desc: 'Minuman dingin & cemilan. 2 orang sekali ambil.' },
-      { name: 'Kulkas + Rak Snack', cost: 22, lvl: 4, slots: 3, mood: 9, energy: 15, desc: 'Keripik, cokelat, dan mochi! 3 slot.' }
+      { name: 'Kulkas + Rak Snack', cost: 22, lvl: 4, slots: 3, mood: 9, energy: 15, desc: 'Keripik, cokelat, dan mochi! 3 slot.' },
+      { name: 'Kulkas Besar Pintu Ganda', cost: 40, lvl: 6, slots: 3, mood: 12, energy: 20, disc: 0.1, stock: 1.3, desc: 'Stok lebih banyak (+30%) & belanja makan siang diskon 10%.' },
+      { name: 'Smart Fridge + Dapur Mini', cost: 75, lvl: 9, slots: 4, mood: 16, energy: 26, disc: 0.2, stock: 1.6, desc: '4 slot, stok +60%, makan siang diskon 20%. Dapur kantor lengkap!' }
+    ]
+  },
+  hall: {
+    name: 'Ruang Aula', emoji: '🎊', room: 'Aula Pesta',
+    levels: [
+      { name: 'Aula Sederhana', cost: 38, lvl: 6, slots: 28, party: 1, desc: 'Ruang pesta untuk seluruh karyawan setelah proyek rilis!' },
+      { name: 'Aula + Panggung & Lampu Disko', cost: 80, lvl: 10, slots: 28, party: 1.35, desc: 'Panggung, sound system & bola disko. Pesta jadi 35% lebih seru!' }
     ]
   },
   ps: {
@@ -135,6 +144,16 @@ export const FACILITIES = {
     ]
   }
 };
+
+// Menu makan siang (biaya per orang, jt). Karyawan makan di Ruang Makan tiap jam 12:00.
+export const LUNCH_MENUS = [
+  { id: 'bekal', emoji: '🥪', name: 'Bawa bekal sendiri', cost: 0, energy: 8, mood: -2, stress: 0, desc: 'Gratis, tapi karyawan kurang senang.' },
+  { id: 'hemat', emoji: '🍱', name: 'Nasi Kotak Hemat', cost: 0.12, energy: 15, mood: 2, stress: 0, desc: 'Murah meriah, cukup isi tenaga.' },
+  { id: 'sehat', emoji: '🥗', name: 'Katering Sehat', cost: 0.22, energy: 25, mood: 6, stress: -3, desc: 'Salad, ayam panggang & buah. Energi & mood naik.' },
+  { id: 'prasmanan', emoji: '🍛', name: 'Prasmanan Nusantara', cost: 0.4, energy: 36, mood: 12, stress: -8, desc: 'Rendang, sayur, sambal & kerupuk! Tim senang banget.' }
+];
+export const DISHES = ['Ayam Geprek', 'Soto Ayam', 'Gado-gado', 'Nasi Rames', 'Mie Ayam', 'Nasi Goreng Spesial', 'Rawon', 'Pecel Lele'];
+export const PARTY_OPTS = { big: { cost: 6, mood: 22, stress: 14, xp: 40, label: 'Pesta Besar' }, small: { cost: 4, mood: 12, stress: 8, xp: 20, label: 'Syukuran' } };
 
 // Tiga departemen, masing-masing punya area meja (maks 3 meja per departemen)
 export const DEPTS = {

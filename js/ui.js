@@ -1,5 +1,5 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
+import { LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
@@ -43,6 +43,7 @@ export class UI {
     g.on('change', () => { this.render(true); this.hud(true); });
     g.on('levelup', d => this.enqueue(() => this.showLevelUp(d)));
     g.on('event', ev => this.enqueue(() => this.showEvent(ev)));
+    g.on('lunchmenu', () => this.enqueue(() => this.showLunchDialog()));
     g.on('report', r => this.enqueue(() => this.showReport(r)));
     $('#hint').addEventListener('click', e => { if (e.target.closest('button')) { this.hintDismissed[this.lastHint] = performance.now(); this.updateHint(true); } });
     this.desktop.addEventListener('change', () => this.afterModeChange());
@@ -88,8 +89,8 @@ export class UI {
     const g = this.g;
     switch (e.st) {
       case 'sick': return e.hidden ? '🏖️ Sedang cuti (di luar kantor)' : '😵 Burnout — sedang pulih';
-      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', gossip: '🗣️ Bergosip (kerja tersendat)', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
-      case 'act': return ({ coffee: '☕ Sedang ngopi', gossip: '🗣️ Bergosip', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
+      case 'act': if (e.act && e.act.kind === 'meeting') return '📋 Rapat di Ruang Meeting'; return ({ coffee: '☕ Sedang ngopi', lunch: '🍽️ Makan siang', party: '🎉 Pesta di Aula', greet: '🙇 Menyambut Direksi', gossip: '🗣️ Bergosip (kerja tersendat)', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', pool: '🏊 Berenang', nap: '😴 Tidur sebentar', summon: '📢 Dipanggil Kepala Divisi' })[e.act && e.act.kind] || '…';
+      case 'act': return ({ coffee: '☕ Sedang ngopi', lunch: '🍽️ Makan siang', party: '🎉 Pesta di Aula', greet: '🙇 Menyambut Direksi', gossip: '🗣️ Bergosip', snack: '🍪 Ngemil', ps: '🎮 Main PS', play: '🛝 Bermain seru', nap: '😴 Tidur sebentar' })[e.act && e.act.kind] || '…';
       case 'queue': return '⏳ Antri fasilitas';
       case 'walk': if (e.onLeave) return '🚪 Berjalan ke pintu (cuti)'; if (e.leaving) return '🚪 Meninggalkan kantor'; return e.goal === 'act' || e.goal === 'queue' ? '🚶 Menuju istirahat' : '🚶 Berjalan';
       case 'work': { const t = g.task(e.task); return `💼 ${t ? t.title : 'Bekerja'}`; }
@@ -332,7 +333,7 @@ export class UI {
     if (h.type === 'desk') { sfx('tap'); this.openTab('shop', 'desk:' + h.dept); return; }
     if (h.type === 'room') {
       sfx('tap');
-      if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
+      if (h.kind === 'dining') { this.showLunchDialog(); return; } if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
     }
   }
 
@@ -474,6 +475,22 @@ export class UI {
       if (ok) { this.closeModal(); this.render(true); this.hud(true); if (r.type === 'project') setTimeout(() => { const p = g.s.projects[g.s.projects.length - 1]; if (p && p.state === 'plan') this.showKickoffDialog(p.id); }, 120); }
     });
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
+  }
+
+  // Dialog menu makan siang: biaya dipotong saat jam makan siang untuk semua karyawan
+  showLunchDialog() {
+    const g = this.g, s = g.s, L = s.lunch; if (!L || L.day !== s.day || !['none', 'asked'].includes(L.state) || s.hour >= 12) return;
+    const n = g.lunchDiners().length, disc = g.lunchDisc();
+    const menus = LUNCH_MENUS.map(m => ({ m, total: g.lunchCost(m.id) }));
+    const root = this.openModal(`<div style="font-size:42px;text-align:center">🍽️</div><h2>Menu makan siang hari ini</h2>
+      <p>${n} karyawan akan makan di Ruang Makan pukul 12:00. Menu hari ini: <b>${g.lunchDish()}</b>.<br>Biaya dipotong dari kas saat makan siang.${disc ? ` <b>Diskon kulkas −${Math.round(disc * 100)}%</b>` : ''}</p>
+      <div class="choices">${menus.map(({ m, total }) => `<button class="choice" data-m="${m.id}" ${total > s.money ? 'disabled' : ''}>${m.emoji} ${m.id === 'hemat' ? 'Nasi Kotak ' + g.lunchDish() : m.name} · ${total ? fmtMoney(total) : 'Gratis'}<small>${m.desc} (⚡+${m.energy} 💚${m.mood >= 0 ? '+' : ''}${m.mood}${m.stress ? ' 😣' + m.stress : ''}) · ${fmtMoney(m.cost * (1 - disc))}/orang</small></button>`).join('')}</div>
+      <button class="btn ghost block" style="margin-top:10px" data-close>Nanti saja</button>`);
+    root.addEventListener('click', ev => {
+      if (ev.target.closest('[data-close]')) { sfx('tap'); L.state = 'asked'; this.closeModal(); return; }
+      const b = ev.target.closest('.choice'); if (!b || b.disabled) return;
+      if (g.orderLunch(b.dataset.m)) { sfx('buy'); this.closeModal(); this.render(true); this.hud(true); }
+    });
   }
 
   showSummonDialog(id) {
