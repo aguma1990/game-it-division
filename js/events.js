@@ -249,7 +249,7 @@ export const EVENTS = [
         choices: [
           { label: `💸 Bayar tebusan (${fmtMoney(pay)})`, hint: 'Pasti pulih, tapi kas terkuras', cost: pay, run: g => { g.addMoney(-pay); g.addStat('risk', 4); return { good: false, text: `Tebusan dibayar ${fmtMoney(pay)}. Data pulih, tapi reputasi tercoreng.` }; } },
           { label: '💾 Restore dari backup', hint: 'Peluang tergantung server & keamanan', run: g => {
-            const ok = Math.random() < 0.4 + (g.s.fac.server - 1) * 0.1 + g.s.security / 300;
+            const ok = Math.random() < 0.4 + (g.s.fac.server - 1) * 0.1 + g.s.security / 300 + g.sysBonus('restore');
             if (ok) { g.addMoney(-1.5 * m); g.addStat('service', -3); g.addXp(40); return { good: true, text: 'Backup selamat! Pulih tanpa tebusan. (+40 XP)' }; }
             g.addMoney(-loss); g.addStat('service', -12); g.addStat('risk', 10); return { good: false, text: `Backup ternyata rusak! Pemulihan darurat menelan ${fmtMoney(loss)}.` };
           } },
@@ -265,7 +265,7 @@ export const EVENTS = [
   {
     id: 'finefine', can: g => g.s.day >= 8 && g.s.risk > 38, weight: g => 2 + (g.s.risk > 60 ? 2 : 0),
     build: g => {
-      const fine = r1((6 + g.s.risk / 6) * g.costMul());
+      const fine = r1((6 + g.s.risk / 6) * g.costMul() * (1 - g.sysBonus('fine')));
       return {
         id: 'finefine', emoji: '⚖️', title: 'Denda Regulator!', mood: 'bad',
         text: `Regulator menemukan celah kepatuhan akibat risiko yang tinggi. Denda ${fmtMoney(fine)} dijatuhkan.`,

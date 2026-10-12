@@ -149,11 +149,27 @@ export const FACILITIES = {
       { name: 'Rak Server Dasar', cost: 0, lvl: 1, slots: 2, sec: 0, desc: 'Awal yang sederhana.' },
       { name: 'Rak + UPS Kucing', cost: 24, lvl: 3, slots: 2, sec: 0.5, desc: 'Listrik aman. Keamanan naik pelan tiap hari.' },
       { name: 'Pendingin & Firewall Imut', cost: 48, lvl: 5, slots: 3, sec: 1.0, desc: '3 meja ops + keamanan naik lebih cepat.' },
-      { name: 'Datacenter Mini Tier-3', cost: 90, lvl: 8, slots: 3, sec: 1.6, desc: 'Server adem, risiko turun, bank tenang.' }
+      { name: 'Datacenter Mini Tier-3', cost: 90, lvl: 8, slots: 3, sec: 1.6, desc: 'Server adem, risiko turun, bank tenang.' },
+      { name: 'Cluster High-Availability', cost: 0, lvl: 11, slots: 3, sec: 2.2, viaSys: 'ha', desc: 'Upgrade lewat "Upgrade Sistem" (instalasi bertahap).' },
+      { name: 'Private Cloud + DR Site Aktif', cost: 0, lvl: 14, slots: 3, sec: 3.0, viaSys: 'cloud', desc: 'Upgrade lewat "Upgrade Sistem" (instalasi bertahap).' }
     ]
   }
 };
 
+// Upgrade sistem & keamanan (mahal, dipasang bertahap oleh staf lewat tiket; butuh uji & aktivasi yang benar)
+export const SYSTEMS = {
+  waf:    { name: 'WAF (Web Application Firewall)', emoji: '🧱', cost: 90, lvl: 5, upkeep: 1.2, steps: [['ops', 'Instalasi appliance WAF', 110], ['sec', 'Penyusunan aturan & hardening', 90]], sec: 0.8, risk: 0.5, shield: { ddos: 0.45, phishing: 0.2, bugprod: 0.2 }, desc: 'Menyaring serangan aplikasi web (SQLi, XSS, bot). Serangan DDoS & eksploitasi berkurang.' },
+  ips:    { name: 'Anti-DDoS & IPS', emoji: '🛡️', cost: 75, lvl: 6, upkeep: 1.0, steps: [['ops', 'Pasang sensor IPS', 100], ['sec', 'Tuning signature', 70]], sec: 0.5, risk: 0.3, shield: { ddos: 0.5 }, desc: 'Mendeteksi & memblokir lalu lintas berbahaya secara real-time.' },
+  backup: { name: 'Backup Terenkripsi & DR Site', emoji: '💾', cost: 110, lvl: 6, upkeep: 1.5, steps: [['dba', 'Konfigurasi replikasi data', 120], ['ops', 'Uji pemulihan (DR drill)', 90]], sec: 0.3, restore: 0.3, shield: { serverdown: 0.35, blackout: 0.3 }, desc: 'Peluang restore saat ransomware +30%, gangguan server & listrik lebih ringan.' },
+  apm:    { name: 'APM & Monitoring Terpusat', emoji: '📈', cost: 85, lvl: 5, upkeep: 1.1, steps: [['ops', 'Pasang agen monitoring', 90], ['dba', 'Dashboard & alert', 70]], svc: 0.6, shield: { serverdown: 0.3, hwfail: 0.25 }, desc: 'Masalah terdeteksi lebih dini: penurunan layanan harian lebih kecil.' },
+  cicd:   { name: 'CI/CD & Code Scanning (DevSecOps)', emoji: '🔁', cost: 100, lvl: 6, upkeep: 1.2, steps: [['dev', 'Bangun pipeline CI/CD', 110], ['sec', 'Integrasi SAST/DAST', 80]], bug: 0.5, pq: 0.3, shield: { bugprod: 0.5 }, desc: 'Bug lolos produksi berkurang separuh; kualitas proyek naik.' },
+  pam:    { name: 'PAM (Privileged Access Mgmt)', emoji: '🔑', cost: 130, lvl: 7, upkeep: 1.6, steps: [['ctrl', 'Inventarisasi akun istimewa', 90], ['ops', 'Integrasi & vault kredensial', 120]], sec: 0.7, risk: 0.7, fine: 0.4, shield: { breach: 0.5, finefine: 0.3 }, desc: 'Mengamankan akun admin. Kebocoran data berkurang & denda regulator turun 40%.' },
+  apigw:  { name: 'API Gateway & Open Banking', emoji: '🌐', cost: 150, lvl: 8, upkeep: 1.8, steps: [['dev', 'Bangun API gateway', 140], ['ctrl', 'Uji kepatuhan & sertifikasi API', 90]], income: 0.08, desc: 'Membuka layanan fintech: imbalan tiket & proyek +8%.' },
+  siem:   { name: 'SIEM & SOC 24/7', emoji: '📡', cost: 190, lvl: 9, upkeep: 2.6, steps: [['sec', 'Integrasi sumber log', 130], ['ctrl', 'Use-case & playbook SOC', 110]], sec: 1.0, risk: 0.9, restore: 0.1, shield: { ransom: 0.3, breach: 0.3, phishing: 0.3 }, desc: 'Pemantauan keamanan 24 jam. Ancaman terdeteksi sebelum jadi insiden.' },
+  ha:     { name: 'Upgrade Server: Cluster HA', emoji: '🖥️', cost: 160, lvl: 11, upkeep: 2.2, req: { server: 4 }, setServer: 5, steps: [['ops', 'Rack & kabling cluster', 140], ['dba', 'Replikasi & failover', 120], ['ops', 'Uji failover', 90]], sec: 0.4, shield: { serverdown: 0.5, hwfail: 0.3, blackout: 0.3 }, desc: 'Server berlapis: layanan tetap hidup walau satu node mati.' },
+  cloud:  { name: 'Upgrade Server: Private Cloud + DR', emoji: '☁️', cost: 320, lvl: 14, upkeep: 4.0, req: { sys: 'ha' }, setServer: 6, steps: [['dba', 'Migrasi beban ke private cloud', 180], ['ops', 'Konfigurasi DR site aktif', 150], ['sec', 'Audit keamanan cloud', 110]], sec: 0.8, income: 0.05, shield: { serverdown: 0.3, ddos: 0.2 }, desc: 'Kapasitas elastis & DR site aktif. Pendapatan +5%.' },
+  core:   { name: 'Modernisasi Core Banking', emoji: '🏛️', cost: 420, lvl: 12, upkeep: 4.5, steps: [['dba', 'Migrasi data core', 200], ['dev', 'Re-platform modul inti', 240], ['ops', 'Cut-over & stabilisasi', 160]], income: 0.12, svc: 0.3, desc: 'Fondasi bank modern. Pendapatan +12%, tapi proyek raksasa!' }
+};
 // Tingkat kesulitan & kondisi ekonomi: bikin kas mudah menipis, dan kebangkrutan bisa terjadi
 export const DIFFS = {
   easy:   { name: 'Santai',  emoji: '🌱', income: 1.1,  over: 0.7, evt: 0.7, bail: 99, desc: 'Biaya ringan, dana darurat tak terbatas. Cocok untuk santai.' },

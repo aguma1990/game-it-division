@@ -1,5 +1,5 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
+import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
@@ -127,13 +127,14 @@ export class UI {
     const order = { doing: 0, done: 1, new: 2 };
     const tasks = [...s.tasks].sort((a, b) => order[a.state] - order[b.state] || a.deadline - b.deadline);
     const adv = g.loadAdvice().map(x => x.dept + x.open + x.staff).join(',') + DEPT_KEYS.map(k => g.deptLoad(k).open + ':' + g.deptLoad(k).staff).join(',');
-    const sig = 'T' + s.day + Math.round(s.money * 2) + s.employees.length + (s.debt || 0) + (s.econ ? s.econ.id + s.econ.left : '') + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
+    const sig = 'T' + s.day + (s.debuff ? s.debuff.left : '') + Math.round(s.money * 2) + s.employees.length + (s.debt || 0) + (s.econ ? s.econ.id + s.econ.left : '') + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
     let html = `<div class="toggles">
       <button class="tog ${s.auto ? 'on' : ''}" data-act="toggle" data-k="auto"><span class="sw"></span>🤖 Auto-tugas</button>
       <button class="tog ${s.autoBreak ? 'on' : ''}" data-act="toggle" data-k="autoBreak"><span class="sw"></span>☕ Auto-istirahat</button></div>`;
     const ec = g.econInfo(), di = g.diffInfo(), cost = g.dailyCost(), rw = g.runway();
     html += `<div class="card" style="border-left:7px solid ${rw < 3 ? '#e5484d' : rw < 7 ? '#e0a100' : '#2fae6a'}"><div class="t-title">💰 Keuangan <span class="chip">${di.emoji} ${di.name}</span></div>
       <div class="kv" style="margin-top:6px"><span>Kas</span><b class="${s.money < 0 ? 'r' : ''}">${fmtMoney(s.money)}</b><span>Biaya tetap / hari</span><b>${fmtMoney(cost)}</b><span>↳ gaji + operasional${s.debt ? ' + cicilan' : ''}</span><b>${fmtMoney(g.salaryTotal())} + ${fmtMoney(g.overhead())}${s.debt ? ' + ' + fmtMoney(g.debtPay()) : ''}</b><span>Kas cukup untuk</span><b class="${rw < 3 ? 'r' : ''}">${rw} hari tanpa pemasukan</b>${s.debt ? `<span>🏦 Utang</span><b class="r">${fmtMoney(s.debt)}</b>` : ''}</div>
+      ${s.debuff && s.debuff.left > 0 ? `<div class="t-sub" style="margin-top:6px;font-weight:900;color:#c0392b">⚠️ Kinerja tim turun ${Math.round((1 - s.debuff.mult) * 100)}% (${s.debuff.left} hari lagi): ${esc(s.debuff.why)}</div>` : ''}
       ${ec ? `<div class="t-sub" style="margin-top:6px;font-weight:800">${ec.emoji} ${ec.name} (${s.econ.left} hari lagi): ${ec.desc}</div>` : ''}${s.surcharge ? `<div class="t-sub" style="font-weight:800">🏷️ Kenaikan biaya vendor +${fmtMoney(s.surcharge.amt)}/hari (${s.surcharge.left} hari)</div>` : ''}
       <div class="t-sub" style="margin-top:4px">Pajak mingguan tiap 7 hari · ${di.bail >= 99 ? 'dana darurat tak terbatas' : di.bail ? 'sisa dana darurat: ' + Math.max(0, di.bail - (s.bailouts || 0)) + '×' : 'tanpa dana darurat — kas < −15 jt = bangkrut'}.</div></div>
     <div class="card"><div class="t-title">📊 Beban kerja per bidang</div>${DEPT_KEYS.map(k => {
@@ -156,7 +157,7 @@ export class UI {
         <div class="row"><div class="ico" style="background:${sp.color}">${sp.emoji}</div>
           <div class="grow"><div class="t-title">${esc(t.title)}</div><div class="t-sub">${esc(t.sub)}</div></div>
           ${t.state === 'new' || t.state === 'done' ? act : ''}</div>
-        <div class="chips"><span class="chip" style="background:${TD.color}55;color:#1f3a2e;font-weight:900">${TD.emoji} Bidang: ${TD.name}</span><span class="chip" style="background:${sp.color}33;color:${sp.dark}">${sp.name}</span><span class="chip ${t.pri === 'high' ? 'hi' : t.pri === 'low' ? 'low' : ''}">${P.emoji} ${P.name}</span>${t.state !== 'done' ? dl : ''}<span class="chip money">💰 ${fmtMoney(t.reward)}</span><span class="chip xp">⭐ ${t.xp} XP</span>${t.onsite ? '<span class="chip">🖥️ di ruang server</span>' : ''}</div>
+        <div class="chips"><span class="chip" style="background:${TD.color}55;color:#1f3a2e;font-weight:900">${TD.emoji} Bidang: ${TD.name}</span>${t.sys ? '<span class="chip warn">🛠️ Upgrade sistem</span>' : ''}<span class="chip" style="background:${sp.color}33;color:${sp.dark}">${sp.name}</span><span class="chip ${t.pri === 'high' ? 'hi' : t.pri === 'low' ? 'low' : ''}">${P.emoji} ${P.name}</span>${t.state !== 'done' ? dl : ''}<span class="chip money">💰 ${fmtMoney(t.reward)}</span><span class="chip xp">⭐ ${t.xp} XP</span>${t.onsite ? '<span class="chip">🖥️ di ruang server</span>' : ''}</div>
         ${t.state === 'doing' ? act : ''}</div>`;
     }
     return { html, sig };
@@ -250,7 +251,7 @@ export class UI {
   shopView() {
     const g = this.g, s = g.s;
     const tot = g.totalDesks(), nxD = tot < 27 ? { cost: DESK_COSTS[tot], lvl: DESK_LEVELS[tot] } : null;
-    const sig = 'S' + this.focus + s.level + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
+    const sig = 'S' + this.focus + s.level + '|' + JSON.stringify(s.sys) + Math.floor(s.money / 5) + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
     let html = `<div class="sec-title"><span>Fasilitas</span></div>`;
     for (const [k, F] of Object.entries(FACILITIES)) {
       const lv = s.fac[k], cur = lv ? F.levels[lv - 1] : null, nx = g.nextFac(k);
@@ -260,7 +261,17 @@ export class UI {
         <div class="t-sub">${cur ? '✅ ' + cur.name : 'Belum dibeli'}</div>
         ${nx ? `<div class="t-sub" style="color:var(--pink2);font-weight:800;margin-top:3px">${lv ? '⬆️ ' : '✨ '}${nx.name}</div><div class="t-sub">${nx.desc}</div>` : `<div class="t-sub" style="color:var(--mint2);font-weight:800">Level maksimal! ✨</div>`}
         <div class="lvl-dots">${F.levels.map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></div>
-        ${nx ? `<button class="btn ${locked ? 'ghost' : ''} sm" data-act="buyfac" data-k="${k}" ${locked || poor ? 'disabled' : ''}>${locked ? '🔒 Lv.' + nx.lvl : (lv ? 'Upgrade' : 'Beli')}<br><small>${fmtMoney(nx.cost)}</small></button>` : ''}</div></div>`;
+        ${nx && !nx.viaSys ? `<button class="btn ${locked ? 'ghost' : ''} sm" data-act="buyfac" data-k="${k}" ${locked || poor ? 'disabled' : ''}>${locked ? '🔒 Lv.' + nx.lvl : (lv ? 'Upgrade' : 'Beli')}<br><small>${fmtMoney(nx.cost)}</small></button>` : ''}</div></div>`;
+    }
+    html += `<div class="sec-title"><span>🛡️ Upgrade Sistem & Keamanan (mahal, dipasang bertahap)</span></div><div class="t-sub" style="margin:0 4px 6px;font-weight:700">Beli → staf mengerjakan tiket pemasangan di tab Tugas → uji & aktifkan. Pemasangan asal-asalan (staf lemah, telat, tanpa uji) bisa gagal dan bikin kinerja tim turun.</div>`;
+    for (const [id, S] of Object.entries(SYSTEMS)) {
+      const v = s.sys[id], c = g.sysCanBuy(id);
+      const st = v ? (v.state === 'active' ? `<span class="chip money">✅ Aktif · efektivitas ${Math.round(v.eff * 100)}%</span>` : v.state === 'testing' ? `<span class="chip">🧪 Uji penerimaan (${v.left} hari)</span>` : v.state === 'ready' ? `<span class="chip warn">📥 Menunggu keputusan aktivasi di Inbox</span>` : `<span class="chip">🛠️ Tahap ${v.step + 1}/${S.steps.length}: ${esc(S.steps[Math.min(v.step, S.steps.length - 1)][1])} · kualitas ${v.q.toFixed(1)}</span>`) : '';
+      html += `<div class="card ${!v && !c.ok && !c.money ? 'locked' : ''}"><div class="row"><div class="shop-ico">${S.emoji}</div>
+        <div class="grow"><div class="t-title">${S.name}</div><div class="t-sub">${S.desc}</div>
+        <div class="chips" style="margin-top:4px"><span class="chip money">💰 ${fmtMoney(S.cost)}</span><span class="chip">🧾 ${fmtMoney(S.upkeep)}/hari</span><span class="chip">🔒 Lv.${S.lvl}</span><span class="chip">👥 ${[...new Set(S.steps.map(x => DEPTS[deptOfSpec(x[0])].name))].join(' + ')}</span>${st}</div>
+        ${!v && !c.ok ? `<div class="t-sub" style="color:#c0392b;font-weight:800">${c.why}</div>` : ''}</div>
+        ${!v ? `<button class="btn sm" data-act="buysys" data-k="${id}" ${c.ok ? '' : 'disabled'}>Beli & Pasang<br><small>${fmtMoney(S.cost)}</small></button>` : ''}</div></div>`;
     }
     html += `<div class="sec-title"><span>Meja kerja per departemen</span></div>`;
     for (const d of DEPT_KEYS) {
@@ -321,6 +332,7 @@ export class UI {
       case 'summon': sfx('tap'); this.showSummonDialog(id); return;
       case 'reroll': g.rerollCandidates(); break;
       case 'buyfac': g.buyFacility(k); break;
+      case 'buysys': g.buySystem(k); break;
       case 'buydesk': g.buyDesk(k); break;
       case 'buydecor': g.buyDecor(k); break;
       case 'claimm': g.claimMission(id); break;
