@@ -2,8 +2,8 @@
 
 // Dunia isometrik: grid 16 x 15 petak, petak 64x32 px
 export const GW = 28, GH = 22, TW = 64, TH = 32;
-export const OX = 933, OY = 212;            // posisi piksel petak (0,0)
-export const WORLD_W = 2020, WORLD_H = 1230;
+export const OX = 933, OY = 330;            // posisi piksel petak (0,0)
+export const WORLD_W = 2020, WORLD_H = 1430;
 
 export const SPECS = {
   dev:  { name: 'Developer',        dept: 'Pengembangan Sistem',         emoji: '💻', color: '#8f8cf2', dark: '#6a67d6' },
@@ -103,11 +103,20 @@ export const FACILITIES = {
       { name: 'Smart Fridge + Dapur Mini', cost: 75, lvl: 9, slots: 4, mood: 16, energy: 26, disc: 0.2, stock: 1.6, desc: '4 slot, stok +60%, makan siang diskon 20%. Dapur kantor lengkap!' }
     ]
   },
+  dining: {
+    name: 'Ruang Makan', emoji: '🍽️', room: 'Pantry',
+    levels: [
+      { name: 'Ruang Makan Kecil', cost: 0, lvl: 1, slots: 0, seats: 21, desc: 'Awal yang sederhana: 21 kursi.' },
+      { name: 'Ruang Makan Luas (2× lebih besar)', cost: 30, lvl: 5, slots: 0, seats: 42, desc: 'Pantry diperluas ke utara: 42 kursi, meja & jendela tambahan.' },
+      { name: 'Kantin Besar (3× lebih besar)', cost: 65, lvl: 8, slots: 0, seats: 63, desc: 'Kantin kantor 3× luas awal: 63 kursi, semua karyawan makan lega.' }
+    ]
+  },
   hall: {
     name: 'Ruang Aula', emoji: '🎊', room: 'Aula Pesta',
     levels: [
       { name: 'Aula Sederhana', cost: 38, lvl: 6, slots: 28, party: 1, desc: 'Ruang pesta untuk seluruh karyawan setelah proyek rilis!' },
-      { name: 'Aula + Panggung & Lampu Disko', cost: 80, lvl: 10, slots: 28, party: 1.35, desc: 'Panggung, sound system & bola disko. Pesta jadi 35% lebih seru!' }
+      { name: 'Aula + Panggung & Lampu Disko (2× lebih luas)', cost: 80, lvl: 10, slots: 28, party: 1.35, desc: 'Aula diperluas 2×, ada panggung, sound system & bola disko. Pesta 35% lebih seru!' },
+      { name: 'Grand Ballroom (3× lebih luas)', cost: 150, lvl: 13, slots: 28, party: 1.7, desc: 'Aula raksasa 3× luas awal dengan lounge VIP & dua bola disko. Pesta 70% lebih seru!' }
     ]
   },
   ps: {

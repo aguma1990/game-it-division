@@ -1,7 +1,7 @@
 // Penggambar dunia isometrik (kantor tampak dari atas): lantai, dinding, sekat kaca, furnitur, zona.
 import { TW, TH, OX, OY, SPECS, DEPTS, DEPT_KEYS } from './data.js';
 import { rr, ell, star4, shade } from './chibi.js';
-import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS, ENTRY, DINE_SEATS } from './game.js';
+import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS, ENTRY, DINE_SEATS, hallEnd } from './game.js';
 
 const TAU = Math.PI * 2;
 export const FONT = 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Nunito", system-ui, sans-serif';
@@ -14,7 +14,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const STX = [[6, 7, 3.0], [15.6, 16, 2.0]];                         // lorong tegak tengah; celah menuju sayap timur
 const STY = [[5, 5.5, 2.0], [10, 10.4, 2.4], [15, 15.6, 2.0]];     // area belakang↔ruang kerja; ruang kerja↔server/ops; ↔Gedung Tambahan
 const stretch = (v, regs) => v + regs.reduce((s, [a, b, e]) => s + e * Math.min(1, Math.max(0, (v - a) / (b - a))), 0);
-const unstretch = (w, regs) => { let lo = -5, hi = 45; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (stretch(mid, regs) < w) lo = mid; else hi = mid; } return (lo + hi) / 2; };
+const unstretch = (w, regs) => { let lo = -12, hi = 50; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (stretch(mid, regs) < w) lo = mid; else hi = mid; } return (lo + hi) / 2; };
 export const SX = v => stretch(v, STX), SY = v => stretch(v, STY);
 export const P = (gx, gy, z = 0) => { const X = SX(gx), Y = SY(gy); return [OX + (X - Y) * TW / 2, OY + (X + Y) * TH / 2 - z]; };
 export const unP = (sx, sy) => { const a = (sx - OX) / (TW / 2), b = (sy - OY) / (TH / 2); return { gx: unstretch((a + b) / 2, STX), gy: unstretch((b - a) / 2, STY) }; };
@@ -53,7 +53,7 @@ export function tag(ctx, x, y, text, t, color = '#2fae6a') {
 }
 
 // ---------- zona ----------
-export const zoneAt = (gx, gy) => (gy < 0 ? 'dining' : gx >= 21 && gy < 15.4 ? (gy >= 10.4 ? 'hall' : 'pool') : gy >= 15.4 ? (gx < V_X ? 'ctrl' : gx < 13.7 ? 'dev' : 'ops') : gx >= 16 ? (gy < 10.3 ? 'boss' : 'meet') : gy < 5.2 ? (gx < 6.5 ? 'coffee' : 'ps') : gy < 10.3 ? (gx < V_X ? 'ctrl' : 'dev') : gx < V_X ? 'ops' : gx < 11.1 ? 'server' : 'play');
+export const zoneAt = (gx, gy) => (gy < 0 ? 'dining' : gx >= 21 ? (gy >= 10.4 ? 'hall' : 'pool') : gy >= 15.4 ? (gx < V_X ? 'ctrl' : gx < 13.7 ? 'dev' : 'ops') : gx >= 16 ? (gy < 10.3 ? 'boss' : 'meet') : gy < 5.2 ? (gx < 6.5 ? 'coffee' : 'ps') : gy < 10.3 ? (gx < V_X ? 'ctrl' : 'dev') : gx < V_X ? 'ops' : gx < 11.1 ? 'server' : 'play');
 
 // Ruangan tumbuh mengikuti jumlah meja: semakin banyak karyawan, semakin lebar kantornya
 export const roomEnd = (g, d) => { const n = Math.min(3, g.s.deskCount[d]); return d === 'dev' ? 7.4 + 1.95 * n + 0.65 : 0.7 + 1.95 * n + 0.9; };
@@ -65,7 +65,8 @@ export const roomRects = g => { const dc = g.s.deskCount, two = d => dc[d] > 3; 
 }; };
 // apakah petak (cx,cy) sudah dibangun, atau masih lahan kosong
 export function isBuilt(g, cx, cy) {
-  if (cy < 0) return cx < 6 && cy > -3;                                   // Ruang Makan (perluasan pantry ke utara)
+  if (cx >= 21 && cy >= 10.4) return g.s.fac.hall > 0 && cy < hallEnd(g.s.fac.hall);   // Ruang Aula tumbuh ke selatan tiap upgrade
+  if (cy < 0) return cx < 6 && cy > -3 * (g.s.fac.dining || 1);                                   // Ruang Makan (perluasan pantry ke utara)
   if (cy >= 15.4) {                                                       // Gedung Tambahan (selatan): hanya dibangun setelah meja ke-7+
     const dc = g.s.deskCount, R = roomRects(g), inR = k => cx >= R[k][0] && cx < R[k][2] && cy >= R[k][1] && cy < R[k][3];
     if (dc.ctrl > 6 && (inR('ctrlA') || (cx < 7 && cy < 18.0))) return true;
@@ -74,7 +75,7 @@ export function isBuilt(g, cx, cy) {
     if (cx >= 6 && cx < 7 && (dc.ctrl > 6 || dc.dev > 6 || dc.ops > 6)) return cy < (dc.ops > 6 ? 22 : 20.2);
     return false;
   }
-  if (cx >= 21) return (g.s.fac.pool > 0 && cy < 10.3) || (g.s.fac.hall > 0 && cy >= 10.4 && cy < 15.4);   // kolam renang / Ruang Aula                      // area kolam renang (dibangun setelah dibeli)
+  if (cx >= 21) return g.s.fac.pool > 0 && cy < 10.3;                      // area kolam renang                      // area kolam renang (dibangun setelah dibeli)
   if (cx >= 16) return true;                                              // sayap timur: Ruang Kepala Divisi & Ruang Meeting
   if (cy < 5.2) return true;
   if (cx >= 6 && cx < 7) return true;                                     // lorong tegak
@@ -91,7 +92,7 @@ const FLOORS = {
 };
 export function drawFloor(ctx, g, t) {
   const s = g.s;
-  for (let gy = -3; gy < GHT; gy++) for (let gx = 0; gx < GWD; gx++) {
+  for (let gy = -9; gy < 27; gy++) for (let gx = 0; gx < GWD; gx++) {
     const cx = gx + 0.5, cy = gy + 0.5;
     let z = zoneAt(cx, cy);
     if ((cy > 4.0 && cy < 5.0) || (cx > 6.0 && cx < 7.0 && cy >= 5.0)) z = 'corr';
@@ -118,11 +119,12 @@ export function drawFloor(ctx, g, t) {
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.6;
     for (let k = 0; k < 6; k++) { const yy = y0 + 0.5 + k * ((y1 - y0 - 0.8) / 5), a = P(x0 + 0.3, yy), b = P(x1 - 0.3, yy); ctx.beginPath(); ctx.moveTo(a[0], a[1]); for (let u = 0; u <= 10; u++) { const f = u / 10, px = a[0] + (b[0] - a[0]) * f, py = a[1] + (b[1] - a[1]) * f + Math.sin(t * 2 + f * 9 + k) * 1.8; ctx.lineTo(px, py); } ctx.stroke(); }
   }
-  // Ruang Aula: lantai dansa & lampu pesta
+  // Ruang Aula: lantai dansa & lampu pesta (tumbuh tiap upgrade)
   if (s.fac.hall > 0) {
-    for (let k = 0; k < 6; k++) for (let m = 0; m < 4; m++) poly(ctx, [P(22.0 + k, 11.6 + m * 0.7), P(23.0 + k, 11.6 + m * 0.7), P(23.0 + k, 12.3 + m * 0.7), P(22.0 + k, 12.3 + m * 0.7)].map(p => p), (k + m) % 2 ? 'rgba(255,255,255,0.28)' : 'rgba(150,110,40,0.12)', null);
-    poly(ctx, [P(21.8, 11.55), P(28.0, 11.55), P(28.0, 14.6), P(21.8, 14.6)], null, 'rgba(255,216,77,0.7)', 2);
-    if (g.party) for (let k = 0; k < 7; k++) { const a = t * 1.6 + k * 0.9, [x, y] = P(24.7 + Math.cos(a) * 2.4, 13.0 + Math.sin(a * 1.2) * 1.2); ctx.fillStyle = ['rgba(255,216,77,0.38)', 'rgba(111,207,138,0.38)', 'rgba(111,195,255,0.38)', 'rgba(255,255,255,0.4)'][k % 4]; ell(ctx, x, y, 34, 15); ctx.fill(); }
+    const yE = hallEnd(s.fac.hall) - 0.8, rowsN = Math.floor((yE - 11.6) / 0.7);
+    for (let k = 0; k < 6; k++) for (let m = 0; m < rowsN; m++) poly(ctx, [P(22.0 + k, 11.6 + m * 0.7), P(23.0 + k, 11.6 + m * 0.7), P(23.0 + k, 12.3 + m * 0.7), P(22.0 + k, 12.3 + m * 0.7)], (k + m) % 2 ? 'rgba(255,255,255,0.28)' : 'rgba(150,110,40,0.12)', null);
+    poly(ctx, [P(21.8, 11.55), P(28.0, 11.55), P(28.0, yE), P(21.8, yE)], null, 'rgba(255,216,77,0.7)', 2);
+    if (g.party) for (let k = 0; k < 6 + s.fac.hall * 3; k++) { const a = t * 1.6 + k * 0.9, cy0 = (11.6 + yE) / 2, [x, y] = P(24.7 + Math.cos(a) * 2.4, cy0 + Math.sin(a * 1.2) * ((yE - 11.6) / 2 - 0.6)); ctx.fillStyle = ['rgba(255,216,77,0.38)', 'rgba(111,207,138,0.38)', 'rgba(111,195,255,0.38)', 'rgba(255,255,255,0.4)'][k % 4]; ell(ctx, x, y, 34, 15); ctx.fill(); }
   }
   // karpet Ruang Meeting
   poly(ctx, [P(16.5, 11.0), P(20.9, 11.0), P(20.9, 14.9), P(16.5, 14.9)], '#5a7aa0', 'rgba(255,255,255,0.55)', 2);
@@ -168,7 +170,7 @@ function banner(c, u, v, w, text, color = '#245a40') {
 }
 export function drawWalls(ctx, g, t, hour, using) {
   const s = g.s, W = s.fac.pool > 0 ? 28 : 21, H = s.deskCount.ctrl > 6 ? 20.2 : 15, HO = GHT;
-  const BX = 6, BY = -3;                                   // tonjolan Ruang Makan di utara pantry
+  const BX = 6, BY = -3 * (s.fac.dining || 1);                                   // tonjolan Ruang Makan di utara pantry
   const lw = (z0, z1, col) => poly(ctx, [P(0, BY, z0), P(0, H, z0), P(0, H, z1), P(0, BY, z1)], col, null);
   const bw = (x0, x1, y, z0, z1, col) => poly(ctx, [P(x0, y, z0), P(x1, y, z0), P(x1, y, z1), P(x0, y, z1)], col, null);
   lw(0, WH, '#d4e8da'); lw(0, 30, '#5fb585'); lw(30, 33, '#f4fbf6'); lw(WH, WH + 7, '#245a40');
@@ -231,7 +233,7 @@ export function drawWalls(ctx, g, t, hour, using) {
   // ----- dinding kiri (gx=0): u = (15 - gy) * 32 -----
   const U = gy => (SY(HO) - SY(gy)) * 32;
   onWallL(ctx, HO, 0, c => {
-    windowW(c, U(-1.9), -112, 52, 50, hour, t);
+    for (let k = 0; k < (s.fac.dining || 1); k++) windowW(c, U(-1.9 - 3 * k), -112, 52, 50, hour, t);
     windowW(c, U(2.6), -112, 52, 50, hour, t);
     const ck = U(4.2) + 20; c.fillStyle = '#fff'; c.strokeStyle = '#2c8a5c'; c.lineWidth = 3; c.beginPath(); c.arc(ck, -92, 14, 0, TAU); c.fill(); c.stroke();
     c.strokeStyle = '#1f3a2e'; c.lineCap = 'round'; c.lineWidth = 2; const hh = (hour % 12) / 12 * TAU - Math.PI / 2, mm = (hour % 1) * TAU - Math.PI / 2;
@@ -510,24 +512,25 @@ export function poolProps(g, t, push) {
 }
 // Ruang Makan: meja panjang, bangku, dispenser; hidangan muncul saat jam makan siang
 export function diningProps(g, t, push) {
-  const L = g.s.lunch, eating = L && (L.state === 'eating' || L.state === 'ordered') && g.lunchMenuOf(L.menu);
-  partition(push, 'y', 6.0, -3, 0);
-  for (const [ty, tcol] of [[-2.3, '#e9d2a0'], [-1.4, '#e9d2a0']]) for (let k = 0; k < 5; k++) {
-    const gx = 0.7 + k * 0.92;
+  const L = g.s.lunch, lv = g.s.fac.dining || 1, BYd = -3 * lv, eating = L && (L.state === 'eating' || L.state === 'ordered') && g.lunchMenuOf(L.menu);
+  partition(push, 'y', 6.0, BYd, 0);
+  for (let r = 0; r < lv; r++) for (const ty0 of [-2.3, -1.4]) for (let k = 0; k < 5; k++) {
+    const gx = 0.7 + k * 0.92, ty = ty0 - 3 * r;
     push(gx + 0.46 + ty + 0.4, ctx => {
-      box(ctx, gx, ty, 0.92, 0.4, 20, '#c9a36a', 0, { top: tcol });
+      box(ctx, gx, ty, 0.92, 0.4, 20, '#c9a36a', 0, { top: '#e9d2a0' });
       if (eating && L.state === 'eating') { const [x, y] = P(gx + 0.46, ty + 0.2, 20); ctx.font = '13px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(g.lunchMenuOf(L.menu).emoji, x, y - 4); }
     });
   }
-  DINE_SEATS.forEach((sp, i) => push(sp.x + sp.y - 0.15, ctx => { const [x, y] = P(sp.x, sp.y, 0); ctx.fillStyle = 'rgba(0,40,20,0.16)'; ell(ctx, x, y + 2, 11, 5); ctx.fill(); ell(ctx, x, y - 7, 9, 4.5); ctx.fillStyle = '#6fcf8a'; ctx.fill(); ctx.strokeStyle = 'rgba(0,70,40,0.4)'; ctx.lineWidth = 1; ctx.stroke(); }));
-  push(-0.2 - 0.5, ctx => plantAt(ctx, 5.6, -2.7, 1.1));
-  push(-0.3, ctx => { const [x, y] = P(3.0, -2.95, 100); rr(ctx, x - 52, y - 11, 104, 22, 8); ctx.fillStyle = '#17402f'; ctx.fill(); ctx.strokeStyle = '#5fe39a'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#bff5d4'; ctx.font = font(900, 11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍽️ RUANG MAKAN', x, y + 0.5); });
+  DINE_SEATS.slice(0, 21 * lv).forEach((sp, i) => push(sp.x + sp.y - 0.15, ctx => { const [x, y] = P(sp.x, sp.y, 0); ctx.fillStyle = 'rgba(0,40,20,0.16)'; ell(ctx, x, y + 2, 11, 5); ctx.fill(); ell(ctx, x, y - 7, 9, 4.5); ctx.fillStyle = '#6fcf8a'; ctx.fill(); ctx.strokeStyle = 'rgba(0,70,40,0.4)'; ctx.lineWidth = 1; ctx.stroke(); }));
+  push(-0.2 - 0.5 + BYd, ctx => plantAt(ctx, 5.6, BYd + 0.3, 1.1));
+  for (let r = 1; r < lv; r++) push(-0.6 + BYd * 0.3 + r, ctx => plantAt(ctx, 0.4, -3 * r - 0.25, 1.0));
+  push(-0.3 + BYd, ctx => { const [x, y] = P(3.0, BYd + 0.05, 100); rr(ctx, x - 52, y - 11, 104, 22, 8); ctx.fillStyle = '#17402f'; ctx.fill(); ctx.strokeStyle = '#5fe39a'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#bff5d4'; ctx.font = font(900, 11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lv >= 3 ? '🍽️ KANTIN BESAR' : '🍽️ RUANG MAKAN', x, y + 0.5); });
 }
 // Ruang Aula: panggung, bola disko, balon, meja prasmanan
 export function hallProps(g, t, push) {
   const hl = g.s.fac.hall; if (!hl) return;
-  const party = !!g.party;
-  push(1000 + 30, ctx => roomSign(ctx, 22.0, 10.5, 5.4, 'RUANG AULA', 'Pesta & Perayaan Go-Live', '#a8741f'));
+  const party = !!g.party, YE = hallEnd(hl);
+  push(1000 + 30, ctx => roomSign(ctx, 22.0, 10.5, 5.4, hl >= 3 ? 'GRAND BALLROOM' : 'RUANG AULA', 'Pesta & Perayaan Go-Live', '#a8741f'));
   // panggung (disegmentasi agar urutan kedalaman benar)
   for (let k = 0; k < 5; k++) { const gx = 22.2 + k * 1.1; push(gx + 0.55 + 11.0 + 0.1, ctx => box(ctx, gx, 10.55, 1.1, 0.9, hl > 1 ? 14 : 8, '#8a5a3c', 0, { top: hl > 1 ? '#d6a066' : '#c98a56' })); }
   push(22.2 + 10.5, ctx => {   // layar latar panggung
@@ -536,19 +539,25 @@ export function hallProps(g, t, push) {
     const m = P(24.9, 10.55, 52); ctx.fillStyle = '#fff'; ctx.font = font(900, 14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(party ? '🎉 SELAMAT GO-LIVE! 🎉' : 'SELAMAT & SUKSES', m[0], m[1]);
   });
   if (hl > 1) for (const gx of [21.8, 27.2]) push(gx + 11.0 + 0.4, ctx => { box(ctx, gx, 10.6, 0.5, 0.5, 40, '#2b3a36', 0, { top: '#3a4a46' }); const p = P(gx + 0.25, 11.1, 28); ctx.fillStyle = '#7fffd4'; ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, TAU); ctx.fill(); });
-  // meja prasmanan
-  for (let k = 0; k < 4; k++) { const gx = 22.6 + k * 1.2; push(gx + 0.6 + 14.55 + 0.4, ctx => { box(ctx, gx, 14.6, 1.2, 0.5, 18, '#f4f6f5', 0, { top: '#ffffff' }); const p = P(gx + 0.6, 14.85, 18); ctx.font = '12px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(['🎂', '🍕', '🥤', '🍰'][k], p[0], p[1] - 4); }); }
-  // bola disko + balon
-  push(24.6 + 12.9 + 6, ctx => {
-    const [x, y] = P(24.6, 12.9, 128), sw = party ? Math.sin(t * 2) * 3 : 0; ctx.strokeStyle = 'rgba(60,60,70,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y - 200); ctx.lineTo(x + sw, y - 8); ctx.stroke();
-    if (hl > 1 || party) { const gr = ctx.createRadialGradient(x - 3 + sw, y - 3, 1, x + sw, y, 11); gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#9fb0c8'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x + sw, y, 10, 0, TAU); ctx.fill(); ctx.strokeStyle = '#6a7a8a'; ctx.lineWidth = 1; ctx.stroke();
-      if (party) for (let k = 0; k < 6; k++) { const a = t * 2 + k, px = x + sw + Math.cos(a) * 18, py = y + Math.sin(a) * 9; star4(ctx, px, py, 3, ['#ffd84d', '#7fffd4', '#8fd3ff'][k % 3]); } }
-  });
-  [[22.0, 12.2, '#ffd84d'], [27.5, 12.0, '#5ab8f5'], [22.0, 13.8, '#6fcf8a'], [27.5, 13.6, '#ff7a59'], [27.5, 14.4, '#ffd84d']].forEach(([gx, gy, c], k) => push(gx + gy + 0.2, ctx => {
-    const [x, y] = P(gx, gy, 0), bob = Math.sin(t * 1.6 + k) * 3; ctx.strokeStyle = 'rgba(70,70,70,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 52 + bob); ctx.stroke();
-    ctx.fillStyle = c; ell(ctx, x, y - 62 + bob, 9, 11); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ell(ctx, x - 3, y - 66 + bob, 2.5, 3.5); ctx.fill();
-  }));
-  push(21.6 + 15.0, ctx => plantAt(ctx, 21.6, 14.7, 1.1));
+  // meja prasmanan di sisi selatan (makin banyak seiring upgrade)
+  const nb = 3 + hl;
+  for (let k = 0; k < nb; k++) { const w = 5.6 / nb, gx = 22.2 + k * w; push(gx + w / 2 + YE - 0.8 + 0.4, ctx => { box(ctx, gx, YE - 0.8, w - 0.1, 0.5, 18, '#f4f6f5', 0, { top: '#ffffff' }); const p = P(gx + w / 2, YE - 0.55, 18); ctx.font = '12px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(['🎂', '🍕', '🥤', '🍰', '🍢', '🍉'][k % 6], p[0], p[1] - 4); }); }
+  // bola disko + balon per segmen
+  for (let seg = 0; seg < hl; seg++) {
+    const oy = seg * 5;
+    if (seg === 0 || hl >= 3 || party) push(24.6 + 12.9 + oy + 6, ctx => {
+      const [x, y] = P(24.6, 12.9 + oy, 128), sw = party ? Math.sin(t * 2 + seg) * 3 : 0; ctx.strokeStyle = 'rgba(60,60,70,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y - 200); ctx.lineTo(x + sw, y - 8); ctx.stroke();
+      if (hl > 1 || party) { const gr = ctx.createRadialGradient(x - 3 + sw, y - 3, 1, x + sw, y, 11); gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#9fb0c8'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x + sw, y, 10, 0, TAU); ctx.fill(); ctx.strokeStyle = '#6a7a8a'; ctx.lineWidth = 1; ctx.stroke();
+        if (party) for (let k = 0; k < 6; k++) { const a = t * 2 + k, px = x + sw + Math.cos(a) * 18, py = y + Math.sin(a) * 9; star4(ctx, px, py, 3, ['#ffd84d', '#7fffd4', '#8fd3ff'][k % 3]); } }
+    });
+    [[22.0, 12.2, '#ffd84d'], [27.5, 12.0, '#5ab8f5'], [22.0, 13.8, '#6fcf8a'], [27.5, 13.6, '#ff7a59']].forEach(([gx, gy, c], k) => { if (gy + oy > YE - 1.2) return; push(gx + gy + oy + 0.2, ctx => {
+      const [x, y] = P(gx, gy + oy, 0), bob = Math.sin(t * 1.6 + k + seg) * 3; ctx.strokeStyle = 'rgba(70,70,70,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 52 + bob); ctx.stroke();
+      ctx.fillStyle = c; ell(ctx, x, y - 62 + bob, 9, 11); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ell(ctx, x - 3, y - 66 + bob, 2.5, 3.5); ctx.fill();
+    }); });
+  }
+  // tanaman di sisi aula & lounge VIP (Grand Ballroom)
+  for (let y = 14.7; y < YE - 1.0; y += 3) { push(21.6 + y + 0.3, ctx => plantAt(ctx, 21.6, y, 1.1)); if (hl >= 2) push(27.7 + y + 0.3, ctx => plantAt(ctx, 27.7, y, 1.1)); }
+  if (hl >= 3) for (const sy of [YE - 5.2, YE - 3.6]) push(26.2 + sy + 1.2, ctx => { box(ctx, 26.2, sy, 1.5, 0.7, 14, '#3fa56f', 0, { top: '#58bb85' }); box(ctx, 26.2, sy - 0.15, 1.5, 0.2, 30, '#3fa56f', 0, { top: '#58bb85' }); });
 }
 // Ruang Meeting: meja panjang, kursi, layar presentasi
 export function meetingProps(g, t, push, MEET) {

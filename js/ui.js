@@ -339,7 +339,7 @@ export class UI {
     if (h.type === 'desk') { sfx('tap'); this.openTab('shop', 'desk:' + h.dept); return; }
     if (h.type === 'room') {
       sfx('tap');
-      if (h.kind === 'dining') { this.showLunchDialog(); return; } if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
+      if (h.kind === 'diningUp') { this.openTab('shop', 'fac:dining'); return; } if (h.kind === 'dining') { this.showLunchDialog(); return; } if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
     }
   }
 
@@ -540,13 +540,22 @@ export class UI {
     const g = this.g, s = g.s, p = (s.projects || []).find(x => x.id === pid); if (!p) return;
     const crew = s.employees.filter(e => !e.leaving && e.st !== 'sick'), sel = new Set();
     const root = this.openModal(`<div class="big-emoji">📋</div><h2>Rapat Kick-off</h2><p>${esc(p.name)}<br>Pilih 2–6 peserta. Semakin lengkap perwakilan departemen & semakin tinggi skill, semakin bagus hasil proyek.</p>
-      <div class="sec-title" style="justify-content:center">Peserta (<span id="kCnt">0</span>/6)</div>
-      <div class="sel-list" style="max-height:34dvh;overflow:auto">${crew.map(e => `<button class="sel-item" data-id="${e.id}"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'smile', 40)}" alt=""></div><div class="grow" style="text-align:left"><div class="t-title">${esc(e.name)}</div><div class="t-sub">${SPECS[e.spec].name} · ${DEPTS[deptOfSpec(e.spec)].name} · 💪${e.skill}</div></div><span class="chip" data-mark>＋</span></button>`).join('')}</div>
+      <div class="card" id="kNeeds" style="margin:6px 0"></div>
+      <div class="sec-title" style="justify-content:center">Peserta (<span id="kCnt">0</span>/6) <button class="btn ghost sm" id="kAuto" style="margin-left:8px">✨ Pilih otomatis</button></div>
+      <div class="sel-list" style="max-height:34dvh;overflow:auto">${crew.map(e => `<button class="sel-item" data-id="${e.id}"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'smile', 40)}" alt=""></div><div class="grow" style="text-align:left"><div class="t-title">${esc(e.name)}</div><div class="t-sub"><span class="chip" style="background:${DEPTS[deptOfSpec(e.spec)].color}55;color:#1f3a2e;font-weight:900">${DEPTS[deptOfSpec(e.spec)].emoji} ${DEPTS[deptOfSpec(e.spec)].name}</span> ${SPECS[e.spec].name} · 💪${e.skill}${e.task ? ' · 💼 sedang mengerjakan tiket' : ''}</div></div><span class="chip" data-mark>＋</span></button>`).join('')}</div>
       <div class="sec-title" style="justify-content:center">Fokus proyek</div>
       <div class="choices"><button class="choice" data-sc="fast">⚡ Ngebut<small>Hadiah +30%, tenggat 4 hari, risiko +3</small></button><button class="choice" data-sc="balanced" style="border-color:#2fb36d">⚖️ Seimbang<small>Hadiah normal, tenggat 6 hari</small></button><button class="choice" data-sc="safe">🛡️ Aman<small>Hadiah −8%, tenggat 8 hari, risiko turun</small></button></div>
       <button class="btn block" id="kGo" style="margin-top:10px" disabled>Mulai Rapat 📋</button><button class="btn ghost block" style="margin-top:8px" data-close>Batal</button>`);
     let scope = 'balanced';
-    const upd = () => { root.querySelector('#kCnt').textContent = sel.size; root.querySelector('#kGo').disabled = sel.size < 2; };
+    const upd = () => {
+      root.querySelector('#kCnt').textContent = sel.size; root.querySelector('#kGo').disabled = sel.size < 2;
+      const ck = g.kickoffCheck([...sel]);
+      root.querySelector('#kNeeds').innerHTML = `<div class="t-title" style="font-size:13px">🎯 Kebutuhan proyek (perwakilan per bidang)</div>${ck.needs.map(n => `<div class="t-sub" style="margin-top:3px;font-weight:800;color:${n.ok ? '#1f7a4d' : '#c0392b'}">${n.ok ? '✅' : '❌'} ${DEPTS[n.dept].emoji} ${DEPTS[n.dept].name} — fase ${n.phase}</div>`).join('')}
+        <div class="t-sub" style="margin-top:5px">${ck.missing.length ? `⚠️ Bidang belum terwakili: kualitas proyek −${(0.5 * ck.missing.length).toFixed(1)} & fase bidang itu 30% lebih berat.` : sel.size >= 2 ? '👍 Semua bidang terwakili — perencanaan lengkap.' : 'Pilih minimal 2 peserta.'}${sel.size ? ` Rata-rata skill: ${Math.round(ck.avgSkill)}${ck.avgSkill < 55 ? ' (rendah)' : ''}.` : ''}</div>`;
+      root.querySelectorAll('.sel-item').forEach(b => { const on = sel.has(b.dataset.id); b.style.borderColor = on ? '#2fb36d' : ''; b.querySelector('[data-mark]').textContent = on ? '✔' : '＋'; });
+    };
+    root.querySelector('#kAuto').addEventListener('click', () => { sfx('pop'); sel.clear(); g.kickoffAuto().forEach(id => sel.add(id)); upd(); });
+    upd();
     root.querySelectorAll('.sel-item').forEach(b => b.addEventListener('click', () => { sfx('tap'); const id = b.dataset.id; if (sel.has(id)) sel.delete(id); else if (sel.size < 6) sel.add(id); else return; b.style.borderColor = sel.has(id) ? '#2fb36d' : ''; b.querySelector('[data-mark]').textContent = sel.has(id) ? '✔' : '＋'; upd(); }));
     root.querySelectorAll('[data-sc]').forEach(b => b.addEventListener('click', () => { sfx('tap'); scope = b.dataset.sc; root.querySelectorAll('[data-sc]').forEach(x => { x.style.borderColor = x === b ? '#2fb36d' : ''; }); }));
     root.querySelector('#kGo').addEventListener('click', () => { if (g.startKickoff(pid, [...sel], scope)) { this.closeModal(); this.scene.focusGrid(18.6, 12.8, 1.0); this.render(true); this.hud(true); } });

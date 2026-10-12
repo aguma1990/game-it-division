@@ -44,7 +44,7 @@ export class Scene {
     this.cv.width = Math.round(this.vw * this.dpr); this.cv.height = Math.round(this.vh * this.dpr);
     const a = this.area, fit = this.minZoom();
     if (!this.placed) { // tampilan awal: tinggi pas, di tengah area meja
-      this.cam.z = a.w >= 700 ? Math.max(fit, Math.min(Math.min(a.w / 1250, a.h / 780), 1.1)) : Math.max(fit, Math.min(a.w / 560, a.h / 760, 1.25)); this.cam.x = OX + 40; this.cam.y = 600; this.placed = true;
+      this.cam.z = a.w >= 700 ? Math.max(fit, Math.min(Math.min(a.w / 1250, a.h / 780), 1.1)) : Math.max(fit, Math.min(a.w / 560, a.h / 760, 1.25)); this.cam.x = OX + 40; this.cam.y = 718; this.placed = true;
     }
     this.cam.z = Math.max(fit, this.cam.z); this.clamp();
   }
@@ -101,7 +101,7 @@ export class Scene {
   zoneHit(gx, gy) {
     const s = this.g.s;
     for (let i = 0; i < 27; i++) { if (this.g.deskOwned(i) || i % 9 !== s.deskCount[DEPT_KEYS[Math.floor(i / 9)]]) continue; const { x, y } = deskXY(i); if (gx >= x - 0.1 && gx <= x + 1.8 && gy >= y - 0.1 && gy <= y + 1.0) return { type: 'desk', dept: DEPT_KEYS[Math.floor(i / 9)] }; }
-    if (gx < 0 || gy < -3 || gx > 28 || gy > 22) return null;
+    if (gx < 0 || gy < -9 || gx > 28 || gy > 22) return null;
     return { type: 'room', kind: I.zoneAt(gx, gy) };
   }
 
@@ -180,7 +180,7 @@ export class Scene {
     for (const p of this.petals) { p.y += p.v * dt; p.x += Math.sin(this.t * 1.2 + p.ph) * 12 * dt + 6 * dt; if (p.y > 650) { p.y = -10; p.x = Math.random() * 900; } if (p.x > 900) p.x = -10; }
     if (this.nightFade > 0) this.nightFade = Math.max(0, this.nightFade - dt * 0.9);
     if (this.banner) { this.banner.t += dt; if (this.banner.t > 2.4) this.banner = null; }
-    if (g.party && !g.blocking && s.speed > 0 && Math.random() < 0.12) { const w = this.worldPos(22.5 + Math.random() * 5, 12.8, 120); this.spawn({ kind: 'confetti', x: w.x, y: w.y, vx: (Math.random() - 0.5) * 60, vy: 20 + Math.random() * 30, g: 40, max: 2.4, size: 1, c: ['#3fbf7f', '#ffd84d', '#5ab8f5', '#ff7a59', '#8f8cf2'][Math.floor(Math.random() * 5)], rot: Math.random() * 6 }); }
+    if (g.party && !g.blocking && s.speed > 0 && Math.random() < 0.12) { const w = this.worldPos(22.5 + Math.random() * 5, 11.8 + Math.random() * (5 * s.fac.hall - 2), 120); this.spawn({ kind: 'confetti', x: w.x, y: w.y, vx: (Math.random() - 0.5) * 60, vy: 20 + Math.random() * 30, g: 40, max: 2.4, size: 1, c: ['#3fbf7f', '#ffd84d', '#5ab8f5', '#ff7a59', '#8f8cf2'][Math.floor(Math.random() * 5)], rot: Math.random() * 6 }); }
     this._spT = (this._spT || 0) + dt;
     if (this._spT > 0.5 && s.speed > 0 && !g.blocking) {
       this._spT = 0;
@@ -399,6 +399,10 @@ export class Scene {
     if (s.fac.coffee && s.coffeeStock <= 0) { const [cx, cy] = P(2.0, 0.6, 118); I.tag(ctx, cx, cy, '☕ Stok habis! → Inbox', t, '#e5484d'); this.hits.push({ type: 'room', kind: 'inbox', x0: cx - 70, x1: cx + 70, y0: cy - 16, y1: cy + 20, pri: 7 }); }
     tagFor('pool', 24.0, 4.2, 70);
     tagFor('coffee', 2.0, 0.6, 108); tagFor('snack', 0.65, 1.95, 104); tagFor('hall', 24.5, 12.8, 80);
+    for (const [k, gx, gy, z, kind, lbl] of [['dining', 4.6, -0.7, 70, 'diningUp', 'Perluas Ruang Makan'], ['hall', 24.5, 12.8, 80, 'hall', 'Perluas Aula']]) {
+      const nx = g.nextFac(k); if (!s.fac[k] || !nx || s.level < nx.lvl) continue; const [ux, uy] = P(gx, gy, z), txt = `⬆️ ${lbl} ${fmtMoney(nx.cost)}`;
+      I.tag(ctx, ux, uy, txt, t, s.money >= nx.cost ? '#2fae6a' : '#8fa89a'); ctx.font = font(800, 11); const w = ctx.measureText(txt).width + 20; this.hits.push({ type: 'room', kind, x0: ux - w / 2, x1: ux + w / 2, y0: uy - 16, y1: uy + 20, pri: 6 });
+    }
     const sn = g.nextFac('snack');
     if (s.fac.snack > 0 && sn && s.level >= sn.lvl) { const [ux, uy] = P(0.65, 1.95, 112), txt = `⬆️ Upgrade Kulkas ${fmtMoney(sn.cost)}`; I.tag(ctx, ux, uy, txt, t, s.money >= sn.cost ? '#2fae6a' : '#8fa89a'); ctx.font = font(800, 11); const w = ctx.measureText(txt).width + 20; this.hits.push({ type: 'room', kind: 'snack', x0: ux - w / 2, x1: ux + w / 2, y0: uy - 16, y1: uy + 20, pri: 6 }); }
     if (s.lunch && ['none', 'asked'].includes(s.lunch.state) && s.hour < 12 && s.employees.length) { const [lx, ly] = P(3.0, -1.0, 56), txt = '🍽️ Pilih menu makan siang'; I.tag(ctx, lx, ly, txt, t, '#e0a100'); ctx.font = font(800, 11); const w = ctx.measureText(txt).width + 20; this.hits.push({ type: 'room', kind: 'dining', x0: lx - w / 2, x1: lx + w / 2, y0: ly - 16, y1: ly + 20, pri: 7 }); }

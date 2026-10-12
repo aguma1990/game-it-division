@@ -64,8 +64,16 @@ export const queueSpot = (kind, qi) => ({
 }[kind][qi % 3]);
 
 // Ruang Makan (perluasan pantry ke utara), Aula Pesta (sayap timur) & barisan penyambutan Direksi
-export const DINE_SEATS = (() => { const a = []; for (const y of [-2.55, -1.65, -0.75]) for (let i = 0; i < 7; i++) a.push({ x: 0.95 + i * 0.7, y }); return a; })();
-export const HALL_SLOTS = (() => { const a = []; for (const y of [12.0, 12.7, 13.4, 14.0]) for (let i = 0; i < 7; i++) a.push({ x: 22.3 + i * 0.8, y }); return a; })();
+export const DINE_SEATS = (() => { const a = []; for (let r = 0; r < 3; r++) for (const y of [-2.55, -1.65, -0.75]) for (let i = 0; i < 7; i++) a.push({ x: 0.95 + i * 0.7, y: y - 3 * r }); return a; })();   // 21 kursi per tingkat (maks 3 tingkat)
+export const hallEnd = lvl => 10.4 + 5 * lvl;
+const _hs = {};
+export function hallSlots(lvl) {
+  if (_hs[lvl]) return _hs[lvl];
+  const rows = [0, 4, 7, 10][lvl] || 4, y0 = 12.0, y1 = hallEnd(lvl) - 1.4, all = [];
+  for (let r = 0; r < rows; r++) for (let i = 0; i < 7; i++) all.push({ x: 22.3 + i * 0.8, y: rows > 1 ? y0 + (y1 - y0) * r / (rows - 1) : y0 });
+  const N = all.length, out = []; for (let k = 0; k < N; k++) out.push(all[(k * 17) % N]);   // sebar merata agar tidak menumpuk di satu sisi
+  return (_hs[lvl] = out);
+}
 export const GREET_SLOTS = (() => { const a = []; for (const y of [1.5, 2.1, 2.7, 3.3, 3.9, 4.5]) for (const x of [5.9, 7.4, 5.1, 8.2, 9.0]) a.push({ x, y }); return a; })();
 const DINE_LANE = 5.75;
 
@@ -129,7 +137,7 @@ export class Game {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
     };
@@ -155,7 +163,7 @@ export class Game {
     if (hadCount && this.s.deskV === 2) this.s.employees.forEach(e => { e.desk = Math.floor(e.desk / 6) * 9 + (e.desk % 6); });   // skema meja v3 (9 per departemen)
     this.s.deskV = 3; if (!this.s.projects) this.s.projects = []; this.s.projects.forEach(p => { if (p.state === 'meeting') p.state = 'plan'; });
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
-    if (this.s.fac.hall === undefined) this.s.fac.hall = 0;
+    if (this.s.fac.hall === undefined) this.s.fac.hall = 0; if (!this.s.fac.dining) this.s.fac.dining = 1;
     if (!DIFFS[this.s.diff]) this.s.diff = 'normal'; if (this.s.debt === undefined) this.s.debt = 0; if (this.s.econ === undefined) this.s.econ = null; if (this.s.surcharge === undefined) this.s.surcharge = null;
     if (!this.s.lunch || this.s.lunch.day !== this.s.day) this.s.lunch = { day: this.s.day, state: 'none', menu: null, cost: 0 };
     else if (['asked', 'eating'].includes(this.s.lunch.state)) this.s.lunch.state = this.s.hour < 12 ? 'none' : 'done';
@@ -610,7 +618,7 @@ export class Game {
   salaryTotal() { return r1(this.s.employees.reduce((a, e) => a + e.salary, 0)); }
   overhead() {
     const s = this.s; let up = 0;
-    for (const [k, l] of Object.entries(s.fac)) up += (l || 0) * (k === 'server' ? 0.35 : k === 'pool' || k === 'hall' ? 0.3 : 0.15);
+    for (const [k, l] of Object.entries(s.fac)) up += (l || 0) * (k === 'server' ? 0.35 : k === 'pool' || k === 'hall' ? 0.3 : k === 'dining' ? 0.2 : 0.15);
     const e = this.econInfo(), sur = s.surcharge && s.surcharge.left > 0 ? s.surcharge.amt : 0;
     return r1((1.0 + 0.25 * s.employees.length + 0.06 * this.totalDesks() + up) * (1 + 0.02 * (s.level - 1)) * this.diffInfo().over * (e ? e.over : 1) + sur);
   }
@@ -813,7 +821,7 @@ export class Game {
     let idx = 0;
     for (const e of list) {
       if (e.act && ['summon', 'meeting', 'greet', 'party'].includes(e.act.kind)) { this.applyLunch(e, m); continue; }
-      if (idx >= DINE_SEATS.length) { this.applyLunch(e, m); this.say(e, 'Makan di meja 🍱', 2.5); continue; }
+      if (idx >= 21 * (s.fac.dining || 1)) { this.applyLunch(e, m); this.say(e, 'Makan di meja 🍱', 2.5); continue; }
       this.cancelActivity(e); this.releaseWork(e);
       const sp = DINE_SEATS[idx++]; e.act = { kind: 'lunch', t: 0, dur: ACT_DUR.lunch, arrived: false, menu: m.id };
       this.setPath(e, sp.x, sp.y, 'act'); this.say(e, 'Makan siang! 🍽️', 2.5);
@@ -828,7 +836,7 @@ export class Game {
     for (const e of this.lunchDiners()) {
       if (e.act && ['summon', 'meeting'].includes(e.act.kind)) continue;
       this.cancelActivity(e); this.releaseWork(e);
-      const sp = HALL_SLOTS[i++ % HALL_SLOTS.length]; e.act = { kind: 'party', t: 0, dur: ACT_DUR.party, arrived: false, pk, mult };
+      const hs = hallSlots(s.fac.hall), sp = hs[i++ % hs.length]; e.act = { kind: 'party', t: 0, dur: ACT_DUR.party, arrived: false, pk, mult };
       this.setPath(e, sp.x, sp.y, 'act');
     }
     s.stat.parties = (s.stat.parties || 0) + 1;
@@ -1140,7 +1148,7 @@ export class Game {
     const att = attIds.map(id => this.emp(id)).filter(e => e && !e.leaving && e.st !== 'sick');
     if (att.length < 2) { this.toast('Pilih minimal 2 peserta rapat 👥', 'warn'); return false; }
     this.emit('dir', { pose: 'wave', text: 'Ayo rapat kick-off! 📋', face: 'happy', dur: 2.4 });
-    p.state = 'meeting'; p.scope = scope; p.att = att.map(e => e.id); p.left = att.length;
+    p.state = 'meeting'; p.scope = scope; p.missing = this.kickoffCheck(att.map(e => e.id)).missing; p.att = att.map(e => e.id); p.left = att.length;
     att.slice(0, 6).forEach((e, i) => {
       this.cancelActivity(e); this.releaseWork(e);
       this.slots.meeting[i] = e.id; e.act = { kind: 'meeting', slot: i, t: 0, dur: 14, arrived: false, proj: pid };
@@ -1150,12 +1158,21 @@ export class Game {
     this.toast(`📋 Rapat kick-off ${p.name} dimulai di Ruang Meeting`, 'info'); this.emit('sfx', 'ding'); this.emit('change'); return true;
   }
   meetingDone(pid) { const p = this.s.projects.find(x => x.id === pid); if (!p || p.state !== 'meeting') return; p.left--; if (p.left <= 0) this.finishKickoff(p); }
+  // Cek kebutuhan rapat: tiap fase proyek butuh wakil dari bidangnya (Analisis→Pengendalian, Pengembangan→Pengembangan, Implementasi→Operasional)
+  kickoffNeeds() { return PROJECT_PHASES.map(([spec, phase]) => ({ dept: deptOfSpec(spec), phase })); }
+  kickoffCheck(ids) {
+    const att = ids.map(id => this.emp(id)).filter(Boolean), have = new Set(att.map(e => deptOfSpec(e.spec)));
+    const needs = this.kickoffNeeds().map(n => ({ ...n, ok: have.has(n.dept) }));
+    return { needs, missing: needs.filter(n => !n.ok).map(n => n.dept), avgSkill: att.length ? att.reduce((a, e) => a + e.skill, 0) / att.length : 0, n: att.length };
+  }
+  kickoffAuto() { const ids = []; for (const d of DEPT_KEYS) { const best = this.s.employees.filter(e => !e.leaving && e.st !== 'sick' && !e.hidden && deptOfSpec(e.spec) === d).sort((a, b) => b.skill - a.skill)[0]; if (best) ids.push(best.id); } return ids; }
   finishKickoff(p) {
     const s = this.s, atts = p.att.map(id => this.emp(id)).filter(Boolean), depts = new Set(atts.map(e => deptOfSpec(e.spec))).size;
     const avgSkill = atts.length ? atts.reduce((a, e) => a + e.skill, 0) / atts.length : 50;
     const sc = { fast: { rw: 1.3, wk: 0.92, dl: 4, risk: 3 }, balanced: { rw: 1.0, wk: 1.0, dl: 6, risk: 0 }, safe: { rw: 0.92, wk: 1.0, dl: 8, risk: -2 } }[p.scope] || { rw: 1, wk: 1, dl: 6, risk: 0 };
     const cover = depts >= 3 ? 1.15 : depts === 2 ? 1.05 : 1, skillF = 0.95 + Math.min(0.15, (avgSkill - 55) / 300);
-    p.rw = sc.rw * cover * skillF; p.wk = sc.wk; p.dl = Math.max(3, Math.round(sc.dl * 0.7)); p.q = (depts >= 3 ? 1.5 : depts === 2 ? 0.7 : 0) + (avgSkill > 72 ? 0.6 : 0); p.phase = 0; p.state = 'run';
+    const miss = (p.missing || []).length; if (miss) this.toast(`⚠️ Rapat tanpa wakil bidang ${(p.missing || []).map(d => DEPTS[d].name).join(', ')}: kualitas proyek turun & fase bidang itu lebih berat.`, 'warn');
+    p.rw = sc.rw * cover * skillF; p.wk = sc.wk; p.dl = Math.max(3, Math.round(sc.dl * 0.7)); p.q = (depts >= 3 ? 1.5 : depts === 2 ? 0.7 : 0) + (avgSkill > 72 ? 0.6 : 0) - 0.5 * miss; p.phase = 0; p.state = 'run';
     if (sc.risk > 0) this.addStat('risk', sc.risk); else if (sc.risk < 0) this.cut('risk', -sc.risk);
     this.addXp(60); this.spawnPhase(p);
     this.toast(`✅ Kick-off selesai${cover > 1.1 ? ' dengan perencanaan sempurna ✨' : ''}! Fase 1 proyek ${p.name} dimulai.`, 'good');
@@ -1166,7 +1183,7 @@ export class Game {
   spawnPhase(p, extra) {
     const s = this.s, lv = s.level - 1, PH = PROJECT_PHASES[p.phase]; if (!PH && !extra) return;
     const [spec, phase, work, reward] = PH || PROJECT_PHASES[0];
-    s.tasks.push({ id: nid('T'), title: `${p.name}: ${phase}`, sub: `Fase ${p.phase + 1}/3 · proyek besar`, spec, work: Math.round(work * p.wk * (1 + lv * 0.03)), reward: r1(reward * p.rw * (1 + lv * 0.07)), xp: 90, onsite: spec === 'ops', sec: 0, pri: 'high', deadline: s.day + p.dl, state: 'new', progress: 0, emp: null, late: 0, proj: p.id, ...extra });
+    s.tasks.push({ id: nid('T'), title: `${p.name}: ${phase}`, sub: `Fase ${p.phase + 1}/3 · proyek besar`, spec, work: Math.round(work * p.wk * (1 + lv * 0.03) * ((p.missing || []).includes(deptOfSpec(spec)) ? 1.3 : 1)), reward: r1(reward * p.rw * (1 + lv * 0.07)), xp: 90, onsite: spec === 'ops', sec: 0, pri: 'high', deadline: s.day + p.dl, state: 'new', progress: 0, emp: null, late: 0, proj: p.id, ...extra });
     p.state = 'run'; this.emit('change');
   }
   projectTaskClaimed(t) {
