@@ -1,5 +1,5 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
+import { DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
@@ -44,6 +44,7 @@ export class UI {
     g.on('levelup', d => this.enqueue(() => this.showLevelUp(d)));
     g.on('event', ev => this.enqueue(() => this.showEvent(ev)));
     g.on('lunchmenu', () => this.enqueue(() => this.showLunchDialog()));
+    g.on('gameover', d => { clearSave(); this.mq = []; this.showGameOver(d); });
     g.on('report', r => this.enqueue(() => this.showReport(r)));
     $('#hint').addEventListener('click', e => { if (e.target.closest('button')) { this.hintDismissed[this.lastHint] = performance.now(); this.updateHint(true); } });
     this.desktop.addEventListener('change', () => this.afterModeChange());
@@ -126,11 +127,16 @@ export class UI {
     const order = { doing: 0, done: 1, new: 2 };
     const tasks = [...s.tasks].sort((a, b) => order[a.state] - order[b.state] || a.deadline - b.deadline);
     const adv = g.loadAdvice().map(x => x.dept + x.open + x.staff).join(',') + DEPT_KEYS.map(k => g.deptLoad(k).open + ':' + g.deptLoad(k).staff).join(',');
-    const sig = 'T' + s.day + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
+    const sig = 'T' + s.day + Math.round(s.money * 2) + s.employees.length + (s.debt || 0) + (s.econ ? s.econ.id + s.econ.left : '') + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
     let html = `<div class="toggles">
       <button class="tog ${s.auto ? 'on' : ''}" data-act="toggle" data-k="auto"><span class="sw"></span>🤖 Auto-tugas</button>
       <button class="tog ${s.autoBreak ? 'on' : ''}" data-act="toggle" data-k="autoBreak"><span class="sw"></span>☕ Auto-istirahat</button></div>`;
-    html += `<div class="card"><div class="t-title">📊 Beban kerja per bidang</div>${DEPT_KEYS.map(k => {
+    const ec = g.econInfo(), di = g.diffInfo(), cost = g.dailyCost(), rw = g.runway();
+    html += `<div class="card" style="border-left:7px solid ${rw < 3 ? '#e5484d' : rw < 7 ? '#e0a100' : '#2fae6a'}"><div class="t-title">💰 Keuangan <span class="chip">${di.emoji} ${di.name}</span></div>
+      <div class="kv" style="margin-top:6px"><span>Kas</span><b class="${s.money < 0 ? 'r' : ''}">${fmtMoney(s.money)}</b><span>Biaya tetap / hari</span><b>${fmtMoney(cost)}</b><span>↳ gaji + operasional${s.debt ? ' + cicilan' : ''}</span><b>${fmtMoney(g.salaryTotal())} + ${fmtMoney(g.overhead())}${s.debt ? ' + ' + fmtMoney(g.debtPay()) : ''}</b><span>Kas cukup untuk</span><b class="${rw < 3 ? 'r' : ''}">${rw} hari tanpa pemasukan</b>${s.debt ? `<span>🏦 Utang</span><b class="r">${fmtMoney(s.debt)}</b>` : ''}</div>
+      ${ec ? `<div class="t-sub" style="margin-top:6px;font-weight:800">${ec.emoji} ${ec.name} (${s.econ.left} hari lagi): ${ec.desc}</div>` : ''}${s.surcharge ? `<div class="t-sub" style="font-weight:800">🏷️ Kenaikan biaya vendor +${fmtMoney(s.surcharge.amt)}/hari (${s.surcharge.left} hari)</div>` : ''}
+      <div class="t-sub" style="margin-top:4px">Pajak mingguan tiap 7 hari · ${di.bail >= 99 ? 'dana darurat tak terbatas' : di.bail ? 'sisa dana darurat: ' + Math.max(0, di.bail - (s.bailouts || 0)) + '×' : 'tanpa dana darurat — kas < −15 jt = bangkrut'}.</div></div>
+    <div class="card"><div class="t-title">📊 Beban kerja per bidang</div>${DEPT_KEYS.map(k => {
       const L = g.deptLoad(k), D = DEPTS[k], pct = Math.min(100, L.per / 3.2 * 100), lv = { high: ['#e5484d', '🔴 Kewalahan'], mid: ['#e0a100', '🟡 Sibuk'], low: ['#2fae6a', '🟢 Santai'] }[L.level];
       return `<div style="margin-top:8px"><div class="t-sub" style="display:flex;justify-content:space-between;font-weight:800"><span style="color:#1f3a2e">${D.emoji} ${D.name}</span><span style="color:${lv[0]}">${lv[1]}</span></div>
         <div class="bar" style="height:9px;background:#e1eee6"><i style="width:${pct}%;background:${D.color}"></i></div>
@@ -477,6 +483,14 @@ export class UI {
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
   }
 
+  showGameOver(d) {
+    const root = this.openModal(`<div style="font-size:54px;text-align:center">💸</div><h2>${esc(d.bank || 'Bank')} BANGKRUT!</h2>
+      <p>${esc(d.why)}.<br>Kantor pusat menutup divisi TI-mu.</p>
+      <div class="kv"><span>📅 Bertahan</span><b>${d.day} hari</b><span>⭐ Level</span><b>${d.level}</b><span>✅ Tiket selesai</span><b>${d.tasks}</b><span>🚀 Proyek Go-Live</span><b>${d.projects}</b><span>👥 Karyawan</span><b>${d.staff}</b></div>
+      <p style="margin:8px 0">💡 Tips: pantau <b>Keuangan</b> di tab Tugas, jangan rekrut/beli fasilitas berlebihan, dan siapkan kas untuk insiden.</p>
+      <button class="btn block" id="goAgain">🌿 Main Lagi</button>`);
+    root.querySelector('#goAgain').addEventListener('click', () => { clearSave(); location.reload(); });
+  }
   // Dialog menu makan siang: biaya dipotong saat jam makan siang untuk semua karyawan
   showLunchDialog() {
     const g = this.g, s = g.s, L = s.lunch; if (!L || L.day !== s.day || !['none', 'asked'].includes(L.state) || s.hour >= 12) return;
@@ -717,11 +731,12 @@ export class UI {
       let pick = 0, name = '', bank = 'Bank Sakura Nusantara';
       panel.innerHTML = `<div class="field"><label>Namamu, Direktur</label><input id="inName" maxlength="14" placeholder="mis. Aguma" autocomplete="off"></div>
         <div class="field"><label>Nama bank</label><input id="inBank" maxlength="26" value="${esc(bank)}" autocomplete="off"></div>
+        <div class="field"><label>Tingkat kesulitan</label><select class="sel" id="inDiff">${Object.entries(DIFFS).map(([k, d]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${d.emoji} ${d.name} — ${d.desc}</option>`).join('')}</select></div>
         <div class="field"><label>Pilih penampilanmu</label></div>
         <div class="looks">${DIR_LOOKS.map((l, i) => `<button data-look="${i}" class="${i === 0 ? 'on' : ''}"><img src="${portrait(l, 'dir', 'happy', 74)}" alt=""></button>`).join('')}</div>
         <button class="btn block" data-a="go">Masuk Kantor ✨</button><button class="btn ghost block" style="margin-top:8px" data-a="back">Kembali</button>`;
       panel.querySelectorAll('[data-look]').forEach(b => b.addEventListener('click', () => { pick = +b.dataset.look; panel.querySelectorAll('[data-look]').forEach(x => x.classList.toggle('on', x === b)); sfx('tap'); }));
-      panel.querySelector('[data-a=go]').addEventListener('click', () => { sfx('pop'); stop(); onStart({ mode: 'new', name: panel.querySelector('#inName').value.trim() || 'Direktur', bank: panel.querySelector('#inBank').value.trim() || 'Bank Sakura Nusantara', dirLook: DIR_LOOKS[pick] }); });
+      panel.querySelector('[data-a=go]').addEventListener('click', () => { sfx('pop'); stop(); onStart({ mode: 'new', name: panel.querySelector('#inName').value.trim() || 'Direktur', bank: panel.querySelector('#inBank').value.trim() || 'Bank Sakura Nusantara', dirLook: DIR_LOOKS[pick], diff: panel.querySelector('#inDiff').value }); });
       panel.querySelector('[data-a=back]').addEventListener('click', () => { sfx('tap'); menu(); });
     };
     panel.addEventListener('click', e => {

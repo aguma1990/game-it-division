@@ -2,7 +2,7 @@
 import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
-  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS
+  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS
 } from './data.js';
 import { EVENTS } from './events.js';
 
@@ -125,11 +125,11 @@ export class Game {
   emit(ev, p) { (this.l[ev] || []).forEach(fn => fn(p)); }
 
   // ---------- Sesi ----------
-  newGame({ name, bank, dirLook }) {
+  newGame({ name, bank, dirLook, diff }) {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
     };
@@ -156,6 +156,7 @@ export class Game {
     this.s.deskV = 3; if (!this.s.projects) this.s.projects = []; this.s.projects.forEach(p => { if (p.state === 'meeting') p.state = 'plan'; });
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
     if (this.s.fac.hall === undefined) this.s.fac.hall = 0;
+    if (!DIFFS[this.s.diff]) this.s.diff = 'normal'; if (this.s.debt === undefined) this.s.debt = 0; if (this.s.econ === undefined) this.s.econ = null; if (this.s.surcharge === undefined) this.s.surcharge = null;
     if (!this.s.lunch || this.s.lunch.day !== this.s.day) this.s.lunch = { day: this.s.day, state: 'none', menu: null, cost: 0 };
     else if (['asked', 'eating'].includes(this.s.lunch.state)) this.s.lunch.state = this.s.hour < 12 ? 'none' : 'done';
     if (this.s.starterDone === undefined) this.s.starterDone = true;
@@ -330,7 +331,7 @@ export class Game {
     const t = this.task(id); if (!t || t.state !== 'done') return;
     const e = this.emp(t.doneBy), s = this.s;
     const qm = t.q === 'perfect' ? 1.25 : t.q === 'bug' ? 0.7 : 1;
-    const money = r1(t.reward * qm * (tapped ? 1.1 : 1));
+    const money = r1(t.reward * qm * (tapped ? 1.1 : 1) * this.incomeMul());
     this.addMoney(money); s.week.tasks++; s.stat.tasksDone++;
     if (t.q === 'perfect') s.stat.perfect++;
     this.addXp(Math.round(t.xp * (t.q === 'perfect' ? 1.2 : 1)));
@@ -469,7 +470,7 @@ export class Game {
 
   // ---------- Simulasi ----------
   update(dtReal) {
-    const s = this.s; if (!s || this.blocking || s.speed === 0) return;
+    const s = this.s; if (!s || s.ended || this.blocking || s.speed === 0) return;
     let dt = Math.min(dtReal, 0.25) * s.speed * TIME_SCALE;
     while (dt > 0 && !this.blocking) { const d = Math.min(0.2, dt); this.step(d); dt -= d; }
   }
@@ -601,17 +602,46 @@ export class Game {
     else { e.x += dx / d * m; e.y += dy / d * m; if (Math.abs(dx - dy) > 0.01) e.flip = dx - dy >= 0 ? 1 : -1; }
   }
 
+  // ---------- Keuangan & kesulitan ----------
+  diffInfo() { return DIFFS[this.s.diff] || DIFFS.normal; }
+  econInfo() { const e = this.s.econ; return e && e.left > 0 ? ECONS[e.id] : null; }
+  incomeMul() { const e = this.econInfo(); return this.diffInfo().income * (e ? e.reward : 1); }
+  costMul() { return this.diffInfo().evt * (1 + 0.04 * (this.s.level - 1)); }
+  salaryTotal() { return r1(this.s.employees.reduce((a, e) => a + e.salary, 0)); }
+  overhead() {
+    const s = this.s; let up = 0;
+    for (const [k, l] of Object.entries(s.fac)) up += (l || 0) * (k === 'server' ? 0.35 : k === 'pool' || k === 'hall' ? 0.3 : 0.15);
+    const e = this.econInfo(), sur = s.surcharge && s.surcharge.left > 0 ? s.surcharge.amt : 0;
+    return r1((1.0 + 0.25 * s.employees.length + 0.06 * this.totalDesks() + up) * (1 + 0.02 * (s.level - 1)) * this.diffInfo().over * (e ? e.over : 1) + sur);
+  }
+  debtPay() { return Math.min(this.s.debt || 0, 2.5); }
+  dailyCost() { return r1(this.salaryTotal() + this.overhead() + this.debtPay()); }
+  runway() { const c = this.dailyCost(); return c > 0 ? Math.max(0, Math.floor(this.s.money / c)) : 99; }
+  bankrupt(why) {
+    const s = this.s; if (s.ended) return; s.ended = true;
+    this.emit('sfx', 'lose'); this.addLog('BANGKRUT: ' + why);
+    this.emit('gameover', { day: s.day, level: s.level, projects: s.stat.projects || 0, tasks: s.stat.tasksDone || 0, staff: s.employees.length, why, bank: s.bank });
+  }
   // ---------- Hari ----------
   endDay() {
     const s = this.s, prevDay = s.day;
     this._lunchSpawn = false;
     // gaji
-    const salary = r1(s.employees.reduce((a, e) => a + e.salary, 0));
-    this.addMoney(-salary);
+    const salary = r1(s.employees.reduce((a, e) => a + e.salary, 0)), over = this.overhead(), pay = this.debtPay();
+    this.addMoney(-salary); this.addMoney(-over, 'quiet'); if (pay) { this.addMoney(-pay, 'quiet'); s.debt = r1(s.debt - pay); }
+    let tax = 0; if (s.day % 7 === 0) { tax = r1(Math.max(1.5, Math.max(0, s.money) * 0.05) * this.diffInfo().over); this.addMoney(-tax, 'quiet'); this.toast(`🧾 Pajak & iuran regulator mingguan: −${fmtMoney(tax)}`, 'warn'); }
+    if (s.surcharge) { s.surcharge.left--; if (s.surcharge.left <= 0) { s.surcharge = null; this.toast('📄 Kenaikan biaya vendor berakhir.', 'info'); } }
+    this.toast(`📉 Biaya hari ini: gaji ${fmtMoney(salary)} + operasional ${fmtMoney(over)}${pay ? ` + cicilan ${fmtMoney(pay)}` : ''}${tax ? ` + pajak ${fmtMoney(tax)}` : ''}`, 'info');
     if (s.money < 0) {
       s.employees.forEach(e => e.mood = clamp(e.mood - 12));
-      if (s.money < -15) { s.bailouts++; s.money = 20; s.risk = clamp(s.risk + 8); this.toast('Kantor pusat memberi dana darurat Rp 20 jt… hati-hati ya! 😰', 'warn'); this.addLog('Dana darurat dari kantor pusat.'); }
-    }
+      if (s.money < -15) {
+        if (s.bailouts < this.diffInfo().bail) { s.bailouts++; s.money = r1(s.money + 25); s.debt = r1((s.debt || 0) + 32); s.risk = clamp(s.risk + 8); this.addStat('service', -6); this.toast('🏦 Pinjaman darurat Rp 25 jt dari kantor pusat (utang Rp 32 jt, dicicil Rp 2,5 jt/hari). Hati-hati! 😰', 'warn'); this.addLog('Pinjaman darurat dari kantor pusat.'); }
+        else { this.bankrupt(`kas habis (${fmtMoney(s.money)}) dan tidak ada lagi dana darurat`); return; }
+      }
+    } else if (s.money < this.dailyCost() * 2) this.toast('⚠️ Kas tipis! Biaya harian hampir menghabiskan sisa dana.', 'warn');
+    // kondisi ekonomi berganti
+    if (s.econ) { s.econ.left--; if (s.econ.left <= 0) { s.econ = null; this.toast('🌤️ Kondisi ekonomi kembali normal.', 'info'); } }
+    if (!s.econ && s.day >= 4 && Math.random() < 0.28) { const id = Math.random() < 0.18 ? 'boom' : pick(['resesi', 'inflasi']); s.econ = { id, left: ECONS[id].days }; this.toast(`${ECONS[id].emoji} ${ECONS[id].name}! ${ECONS[id].desc}`, id === 'boom' ? 'good' : 'bad'); this.emit('banner', { text: `${ECONS[id].emoji} ${ECONS[id].name}`, sub: ECONS[id].desc }); this.addLog(`Ekonomi: ${ECONS[id].name}.`); }
     // tenggat
     let overdue = 0;
     for (const t of [...s.tasks]) {
@@ -647,7 +677,7 @@ export class Game {
     if (s.day >= 2 && s.inbox.length < 4 && Math.random() < 0.62) this.genRequest();
     // harian karyawan: pulih sedikit tiap pagi
     s.employees.forEach(e => { e.energy = clamp(e.energy + 18); e.stress = clamp(e.stress - 8); });
-    this.addLog(`Hari baru! Gaji tim −${fmtMoney(salary)}, ${added} tiket baru.`);
+    this.addLog(`Hari baru! Biaya −${fmtMoney(salary + over)}, ${added} tiket baru.`);
     this.emit('newday', { day: s.day, salary, added });
     this.emit('sfx', 'newday');
     this.checkMissions();
@@ -992,12 +1022,13 @@ export class Game {
   genRequest(kind) {
     const s = this.s, emps = s.employees; if (!emps.length) return;
     const kinds = [['repair', 3, () => emps.some(e => !e.broken)], ['leave', 2, () => emps.length >= 2], ['training', 2, () => emps.some(e => e.skill < 95)],
-      ['memo', 2, () => s.day >= 3 && !s.inbox.some(r => r.type === 'memo')], ['project', 2.5, () => s.day >= 4 && !s.inbox.some(r => r.type === 'project')], ['coffee', 0, () => false], ['snack', 0, () => false]];
+      ['memo', 2, () => s.day >= 3 && !s.inbox.some(r => r.type === 'memo')], ['project', 2.5, () => s.day >= 4 && !s.inbox.some(r => r.type === 'project')], ['coffee', 0, () => false], ['snack', 0, () => false], ['invest', 1.4, () => s.day >= 5 && s.money >= 18 && !s.inbox.some(r => r.type === 'invest')]];
     if (!kind) { const pool = kinds.filter(k => k[2]()); let x = Math.random() * pool.reduce((a, k) => a + k[1], 0); kind = pool[0][0]; for (const k of pool) { x -= k[1]; if (x <= 0) { kind = k[0]; break; } } }
     const e = pick(emps.filter(x => kind === 'repair' ? !x.broken : true)) || pick(emps);
     switch (kind) {
       case 'repair': e.broken = true; return this.addRequest({ type: 'repair', icon: '🔧', from: e.id, title: `Laptop ${e.name.split(' ')[0]} rusak`, body: `"Bos, laptop saya mati total dan kerjaan jadi lambat. Boleh diperbaiki atau diganti baru?"`, opts: [{ k: 'fix', label: 'Perbaiki', cost: r1(rnd(1.8, 3)) }, { k: 'new', label: 'Beli baru', cost: r1(rnd(6, 8)) }], ttl: 3 });
       case 'coffee': return this.addRequest({ type: 'coffee', icon: '☕', from: (emps.find(x => x.trait === 'kopi') || e).id, title: 'Stok biji kopi hampir habis', body: '"Mesin kopi tinggal beberapa cangkir lagi… tolong setujui pembelian biji kopi ya!"', opts: [{ k: 'buy', label: 'Beli stok', cost: 3 }, { k: 'premium', label: 'Biji premium', cost: 6 }], ttl: 3 });
+      case 'invest': return this.addRequest({ type: 'invest', icon: '🎲', from: null, sender: 'Mitra Fintech', title: 'Tawaran Investasi Berisiko', body: 'Mitra fintech menawarkan patungan proyek startup. Untung besar kalau berhasil… tapi bisa hangus semua. Mau ambil risikonya?', opts: [{ k: 'small', label: 'Investasi Rp 8 jt (55% untung)', cost: 8 }, { k: 'big', label: 'Investasi Rp 20 jt (40% untung)', cost: 20 }], ttl: 2 });
       case 'snack': return this.addRequest({ type: 'snack', icon: '🍪', from: e.id, title: 'Stok snack hampir habis', body: '"Kulkas hampir kosong, Bos… boleh belanja cemilan lagi?"', opts: [{ k: 'buy', label: 'Belanja snack', cost: 2.5 }, { k: 'premium', label: 'Paket spesial', cost: 5 }], ttl: 3 });
       case 'leave': return this.addRequest({ type: 'leave', icon: '🏖️', from: e.id, title: `${e.name.split(' ')[0]} mengajukan cuti`, body: '"Boleh cuti sehari? Badan rasanya capek banget…" ', opts: [{ k: 'ok', label: 'Setujui cuti', cost: 0 }], ttl: 2 });
       case 'training': { const c = this.trainCost(e); return this.addRequest({ type: 'training', icon: '📚', from: e.id, title: `${e.name.split(' ')[0]} minta ikut pelatihan`, body: '"Ada kursus bagus untuk naik skill. Boleh ikut, Bos?"', opts: [{ k: 'ok', label: 'Setujui', cost: c }], ttl: 3 }); }
@@ -1035,6 +1066,7 @@ export class Game {
     switch (r.type) {
       case 'repair': if (e) { e.broken = false; if (opt.k === 'new') e.deviceBonus = 1.12; e.mood = clamp(e.mood + 8); this.say(e, opt.k === 'new' ? 'Laptop baru! Kencang! 💻✨' : 'Sudah normal lagi! 🔧', 3); this.face(e, 'happy', 3); } break;
       case 'coffee': s.coffeeStock += opt.k === 'premium' ? 45 : 40; if (opt.k === 'premium') s.employees.forEach(x => { x.mood = clamp(x.mood + 3); }); this.toast(`☕ Stok kopi terisi (${s.coffeeStock} cangkir)`, 'good'); break;
+      case 'invest': { const big = opt.k === 'big', win = Math.random() < (big ? 0.4 : 0.55); if (win) { const back = r1(opt.cost * (big ? 2.6 : 1.9) * 1); this.addMoney(back); this.toast(`🎲 Investasi berhasil! Dana kembali ${fmtMoney(back)}.`, 'good'); this.emit('fx', { kind: 'confetti' }); } else this.toast(`💸 Investasi gagal… ${fmtMoney(opt.cost)} hangus.`, 'bad'); break; }
       case 'snack': s.snackStock += Math.round((opt.k === 'premium' ? 40 : 30) * ((this.facInfo('snack') || {}).stock || 1)); if (opt.k === 'premium') s.employees.forEach(x => { x.mood = clamp(x.mood + 3); }); this.toast(`🍪 Stok snack terisi (${s.snackStock} porsi)`, 'good'); break;
       case 'leave': if (e) { this.cancelActivity(e); this.releaseWork(e); const t = e.task && this.task(e.task); if (t) { t.state = 'new'; t.emp = null; e.task = null; } e.stress = clamp(e.stress - 30); e.mood = clamp(e.mood + 18); e.onLeave = true; this.say(e, 'Makasih, Bos! Cuti dulu 🏖️', 4); this.setPath(e, ENTRY.x, ENTRY.y, 'leave'); } break;
       case 'training': if (e) { e.skill = Math.min(99, e.skill + 3); e.xp += 30; e.mood = clamp(e.mood + 6); this.say(e, 'Ilmu baru! 📚', 3); this.emit('fx', { kind: 'stars', x: e.x, y: e.y }); } break;
@@ -1179,7 +1211,7 @@ export class Game {
     else if (k === 'party' && s.fac.hall) { hallParty = 'small'; p.q += 0.6; }
     else if (k === 'party') { s.employees.forEach(e => { e.mood = clamp(e.mood + 15); e.stress = clamp(e.stress - 10); this.say(e, 'Syukuran! 🎉', 3); }); p.q += 0.6; }
     const q = Math.max(0, Math.min(5, p.q)), stars = q >= 4 ? 4 : q >= 3 ? 3 : q >= 1.8 ? 2 : 1;
-    const bonus = r1(10 + q * 5 + s.level * 1.5);
+    const bonus = r1((10 + q * 5 + s.level * 1.5) * this.incomeMul());
     this.addMoney(bonus); this.addXp(Math.round(120 + q * 40)); this.boost('service', 3 + q); this.cut('risk', 1.5 + q * 0.5);
     s.stat.projects = (s.stat.projects || 0) + 1; s.projects = s.projects.filter(x => x.id !== p.id);
     const label = ['', '😅 Lumayan', '👍 Bagus', '🌟 Sangat bagus', '🏆 Luar biasa'][stars];

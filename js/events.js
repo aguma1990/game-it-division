@@ -1,6 +1,7 @@
 // Event acak ala insiden kantor TI bank, dibuat imut.
 import { SPECS, fmtMoney } from './data.js';
 
+const r1 = v => Math.round(v * 10) / 10;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const withSpec = (g, ...sp) => g.emps.filter(e => sp.includes(e.spec));
@@ -235,5 +236,115 @@ export const EVENTS = [
         } }
       ]
     })
+  }
+  ,
+  // ===== Insiden mahal: bikin kas terkuras =====
+  {
+    id: 'ransom', can: g => g.s.day >= 5 && g.s.level >= 2, weight: g => 2 + (g.s.security < 55 ? 2 : 0),
+    build: g => {
+      const m = g.costMul(), pay = r1(11 * m), loss = r1(14 * m);
+      return {
+        id: 'ransom', emoji: '🔒', title: 'RANSOMWARE! Data Dikunci!', mood: 'bad',
+        text: `Layar semua komputer berubah: "Bayar ${fmtMoney(pay)} atau data nasabah dihapus!" Hacker kucing hitam mengancam.`,
+        choices: [
+          { label: `💸 Bayar tebusan (${fmtMoney(pay)})`, hint: 'Pasti pulih, tapi kas terkuras', cost: pay, run: g => { g.addMoney(-pay); g.addStat('risk', 4); return { good: false, text: `Tebusan dibayar ${fmtMoney(pay)}. Data pulih, tapi reputasi tercoreng.` }; } },
+          { label: '💾 Restore dari backup', hint: 'Peluang tergantung server & keamanan', run: g => {
+            const ok = Math.random() < 0.4 + (g.s.fac.server - 1) * 0.1 + g.s.security / 300;
+            if (ok) { g.addMoney(-1.5 * m); g.addStat('service', -3); g.addXp(40); return { good: true, text: 'Backup selamat! Pulih tanpa tebusan. (+40 XP)' }; }
+            g.addMoney(-loss); g.addStat('service', -12); g.addStat('risk', 10); return { good: false, text: `Backup ternyata rusak! Pemulihan darurat menelan ${fmtMoney(loss)}.` };
+          } },
+          { label: '🛡️ Negosiasi pakai tim Security', hint: 'Butuh staf Security: 60% berhasil', run: g => {
+            const sec = withSpec(g, 'sec', 'ctrl');
+            if (sec.length && Math.random() < 0.6) { sec.forEach(e => { e.stress = Math.min(100, e.stress + 10); }); g.addMoney(-4 * m); g.addXp(60); return { good: true, text: `Tim berhasil menekan hacker & menutup celah. Biaya ${fmtMoney(4 * m)}. (+60 XP)` }; }
+            g.addMoney(-pay * 1.3); g.addStat('risk', 8); return { good: false, text: `Negosiasi gagal, tebusan naik jadi ${fmtMoney(pay * 1.3)}!` };
+          } }
+        ]
+      };
+    }
+  },
+  {
+    id: 'finefine', can: g => g.s.day >= 8 && g.s.risk > 38, weight: g => 2 + (g.s.risk > 60 ? 2 : 0),
+    build: g => {
+      const fine = r1((6 + g.s.risk / 6) * g.costMul());
+      return {
+        id: 'finefine', emoji: '⚖️', title: 'Denda Regulator!', mood: 'bad',
+        text: `Regulator menemukan celah kepatuhan akibat risiko yang tinggi. Denda ${fmtMoney(fine)} dijatuhkan.`,
+        choices: [
+          { label: `💰 Bayar denda (${fmtMoney(fine)})`, hint: 'Selesai cepat', cost: fine, run: g => { g.addMoney(-fine); g.addStat('risk', -3); return { good: false, text: `Denda dibayar ${fmtMoney(fine)}.` }; } },
+          { label: '📨 Ajukan banding', hint: '50%: denda dipotong. Gagal: denda 1,6×', run: g => {
+            if (Math.random() < 0.5) { g.addMoney(-fine * 0.4); return { good: true, text: `Banding diterima! Denda hanya ${fmtMoney(fine * 0.4)}.` }; }
+            g.addMoney(-fine * 1.6); g.addStat('risk', 3); return { good: false, text: `Banding ditolak… denda jadi ${fmtMoney(fine * 1.6)}.` };
+          } }
+        ]
+      };
+    }
+  },
+  {
+    id: 'breach', can: g => g.s.day >= 6 && g.s.security < 62, weight: g => 2 + (g.s.security < 45 ? 2 : 0),
+    build: g => {
+      const comp = r1(10 * g.costMul());
+      return {
+        id: 'breach', emoji: '🕳️', title: 'Kebocoran Data Nasabah', mood: 'bad',
+        text: 'Data ribuan nasabah bocor di forum gelap. Nasabah marah dan menuntut ganti rugi!',
+        choices: [
+          { label: `💳 Ganti rugi nasabah (${fmtMoney(comp)})`, hint: 'Layanan pulih, kas terkuras', cost: comp, run: g => { g.addMoney(-comp); g.addStat('service', 4); return { good: false, text: `Ganti rugi ${fmtMoney(comp)} dibayarkan. Nasabah tenang.` }; } },
+          { label: '📣 Kampanye klarifikasi (murah)', hint: 'Layanan & risiko memburuk', run: g => { g.addMoney(-comp * 0.35); g.addStat('service', -9); g.addStat('risk', 7); return { good: false, text: `Klarifikasi ${fmtMoney(comp * 0.35)} kurang meyakinkan. Nasabah kabur.` }; } }
+        ]
+      };
+    }
+  },
+  {
+    id: 'vendor', can: g => g.s.day >= 4 && !g.s.surcharge, weight: g => 2,
+    build: g => {
+      const amt = r1(1.4 * g.costMul());
+      return {
+        id: 'vendor', emoji: '🏷️', title: 'Vendor Menaikkan Harga Lisensi', mood: 'warn',
+        text: `Vendor software menaikkan biaya langganan: +${fmtMoney(amt)}/hari selama 7 hari.`,
+        choices: [
+          { label: 'Terima kenaikan', hint: `Biaya harian +${fmtMoney(amt)} × 7 hari`, run: g => { g.s.surcharge = { amt, left: 7 }; return { good: false, text: 'Biaya operasional naik selama seminggu.' }; } },
+          { label: '🤝 Negosiasi ulang', hint: '55% batal, gagal: lebih mahal', run: g => { if (Math.random() < 0.55) return { good: true, text: 'Vendor mengalah. Harga tetap!' }; g.s.surcharge = { amt: amt * 1.4, left: 7 }; return { good: false, text: 'Negosiasi gagal, kenaikan malah lebih besar.' }; } },
+          { label: `🔁 Pindah ke open source (${fmtMoney(8 * g.costMul())})`, hint: 'Sekali bayar, tanpa kenaikan', cost: r1(8 * g.costMul()), run: g => { g.addMoney(-8 * g.costMul()); g.addXp(30); g.emps.forEach(e => { e.stress = Math.min(100, e.stress + 5); }); return { good: true, text: 'Migrasi ke open source selesai. Tim sedikit pusing. (+30 XP)' }; } }
+        ]
+      };
+    }
+  },
+  {
+    id: 'hwfail', can: g => g.s.day >= 4, weight: g => 2.5,
+    build: g => {
+      const full = r1(7 * g.costMul());
+      return {
+        id: 'hwfail', emoji: '🔥', title: 'Perangkat Keras Terbakar!', mood: 'bad',
+        text: 'Catu daya server korslet dan berasap! Perlu perbaikan atau ganti perangkat.',
+        choices: [
+          { label: `🔧 Ganti perangkat baru (${fmtMoney(full)})`, hint: 'Aman', cost: full, run: g => { g.addMoney(-full); g.addStat('risk', -2); return { good: true, text: `Perangkat diganti (${fmtMoney(full)}). Aman!` }; } },
+          { label: '🩹 Tambal seadanya', hint: 'Murah, tapi 50% kambuh dan lebih mahal', run: g => { g.addMoney(-full * 0.3); if (Math.random() < 0.5) { g.addMoney(-full * 1.3); g.addStat('service', -8); return { good: false, text: `Tambalan jebol! Total biaya membengkak ${fmtMoney(full * 1.6)}.` }; } return { good: true, text: `Tambalan bertahan. Hemat! (${fmtMoney(full * 0.3)})` }; } }
+        ]
+      };
+    }
+  },
+  {
+    id: 'raise', can: g => g.s.day >= 7 && g.emps.length >= 3 && !g.s.raised, weight: g => 1.5,
+    build: g => ({
+      id: 'raise', emoji: '📢', title: 'Karyawan Menuntut Kenaikan Gaji', mood: 'warn',
+      text: 'Harga kebutuhan naik. Serikat karyawan menuntut kenaikan gaji 8%.',
+      choices: [
+        { label: 'Setujui kenaikan 8%', hint: 'Gaji permanen naik, mood naik', run: g => { g.s.raised = true; g.s.employees.forEach(e => { e.salary = r1(e.salary * 1.08 + 0.05); e.mood = Math.min(100, e.mood + 8); }); return { good: false, text: `Gaji naik 8%. Biaya harian sekarang ${fmtMoney(g.salaryTotal())}.` }; } },
+        { label: 'Tolak', hint: 'Mood anjlok, produktivitas turun', run: g => { g.s.raised = true; g.s.employees.forEach(e => { e.mood = Math.max(0, e.mood - 12); e.stress = Math.min(100, e.stress + 6); }); return { good: false, text: 'Karyawan kecewa. Mood tim turun tajam.' }; } }
+      ]
+    })
+  },
+  {
+    id: 'bankrun', can: g => g.s.day >= 10 && g.s.service < 60, weight: g => 2,
+    build: g => {
+      const gift = r1(9 * g.costMul());
+      return {
+        id: 'bankrun', emoji: '🏃', title: 'Nasabah Besar Mau Menarik Dana', mood: 'bad',
+        text: 'Layanan yang menurun bikin nasabah korporasi besar mengancam pindah bank.',
+        choices: [
+          { label: `🎁 Tawarkan paket retensi (${fmtMoney(gift)})`, hint: 'Nasabah bertahan', cost: gift, run: g => { g.addMoney(-gift); g.addStat('service', 6); return { good: true, text: 'Nasabah tetap bertahan. Fiuh!' }; } },
+          { label: 'Biarkan pergi', hint: 'Layanan & kas turun', run: g => { g.addStat('service', -10); g.addMoney(-gift * 0.6); return { good: false, text: 'Nasabah pindah bank. Pendapatan hilang.' }; } }
+        ]
+      };
+    }
   }
 ];

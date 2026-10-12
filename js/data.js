@@ -145,6 +145,19 @@ export const FACILITIES = {
   }
 };
 
+// Tingkat kesulitan & kondisi ekonomi: bikin kas mudah menipis, dan kebangkrutan bisa terjadi
+export const DIFFS = {
+  easy:   { name: 'Santai',  emoji: '🌱', income: 1.1,  over: 0.7, evt: 0.7, bail: 99, desc: 'Biaya ringan, dana darurat tak terbatas. Cocok untuk santai.' },
+  normal: { name: 'Normal',  emoji: '⚖️', income: 1,    over: 1,   evt: 1,   bail: 2,  desc: 'Biaya operasional nyata & 2× dana darurat (berutang).' },
+  hard:   { name: 'Sulit',   emoji: '🔥', income: 0.9,  over: 1.35, evt: 1.4, bail: 1,  desc: 'Biaya tinggi, insiden mahal, hanya 1× dana darurat.' },
+  hell:   { name: 'Neraka',  emoji: '💀', income: 0.8,  over: 1.7, evt: 1.8, bail: 0,  desc: 'Tanpa dana darurat. Kas < −15 jt = BANGKRUT!' }
+};
+export const ECONS = {
+  resesi:   { name: 'Resesi', emoji: '📉', reward: 0.78, over: 1, days: 6, desc: 'Nasabah menahan belanja: imbalan tiket −22%.' },
+  inflasi:  { name: 'Inflasi', emoji: '🔺', reward: 1, over: 1.35, days: 7, desc: 'Harga naik: biaya operasional +35%.' },
+  boom:     { name: 'Ekonomi Boom', emoji: '📈', reward: 1.18, over: 1, days: 5, desc: 'Transaksi ramai: imbalan tiket +18%.' }
+};
+
 // Menu makan siang (biaya per orang, jt). Karyawan makan di Ruang Makan tiap jam 12:00.
 export const LUNCH_MENUS = [
   { id: 'bekal', emoji: '🥪', name: 'Bawa bekal sendiri', cost: 0, energy: 8, mood: -2, stress: 0, desc: 'Gratis, tapi karyawan kurang senang.' },

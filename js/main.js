@@ -27,7 +27,7 @@ game.on('change', () => { dirty = true; });
 
 function begin(opts) {
   if (opts.mode === 'continue') { const s = loadSave(); if (s) game.load(s); else game.newGame({ name: 'Direktur', dirLook: undefined }); }
-  else game.newGame({ name: opts.name, bank: opts.bank, dirLook: opts.dirLook });
+  else game.newGame({ name: opts.name, bank: opts.bank, dirLook: opts.dirLook, diff: opts.diff });
   ui.startSession();
   game.s.speed = 1;
   if (opts.mode === 'new') { game.s.speed = 0; ui.showStarterWizard(() => { hooks.save(); ui.showWelcome(); }); }
