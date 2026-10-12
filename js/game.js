@@ -236,7 +236,8 @@ export class Game {
   // ---------- Tiket ----------
   spawnTask(spec, prio) {
     const s = this.s, team = [...new Set(s.employees.map(e => e.spec))];
-    spec = spec || (team.length && Math.random() < 0.72 ? pick(team) : pick(SPEC_KEYS));
+    const live = SPEC_KEYS.filter(k => s.employees.some(e => deptOfSpec(e.spec) === deptOfSpec(k)));   // hanya bidang yang punya staf
+    spec = spec || (team.length && Math.random() < 0.72 ? pick(team) : pick(live.length ? live : SPEC_KEYS));
     const tpl = pick(TASK_TEMPLATES.filter(t => t.spec === spec));
     if (!prio) { const x = Math.random() * 100; const hi = 16 + s.level * 2; prio = x < hi ? 'high' : x < hi + 26 ? 'low' : 'mid'; }
     const P = PRIORITY[prio], lv = s.level - 1;
@@ -250,7 +251,27 @@ export class Game {
   }
   activeTasks() { return this.s.tasks.filter(t => t.state === 'new' || t.state === 'doing').length; }
 
-  matchFactor(e, t) { return e.spec === t.spec ? 1 : 0.5; }
+  // Tiket hanya bisa dikerjakan bidang (departemen) pemiliknya
+  canDo(e, t) { return deptOfSpec(e.spec) === deptOfSpec(t.spec); }
+  matchFactor(e, t) { return e.spec === t.spec ? 1 : this.canDo(e, t) ? 0.8 : 0; }
+  // Beban kerja per bidang
+  deptLoad(dk) {
+    const s = this.s, staff = s.employees.filter(e => !e.leaving && deptOfSpec(e.spec) === dk);
+    const ts = s.tasks.filter(t => t.state !== 'done' && deptOfSpec(t.spec) === dk);
+    const idle = staff.filter(e => !e.task && e.st !== 'sick' && !e.hidden).length;
+    const open = ts.length, late = ts.filter(t => t.late).length, n = staff.length, per = n ? open / n : open;
+    const level = !n || per >= 2.6 || (late > 0 && idle === 0) ? 'high' : per >= 1.6 ? 'mid' : 'low';
+    return { dept: dk, open, waiting: ts.filter(t => t.state === 'new').length, late, staff: n, idle, per, level, need: level === 'high' && s.deskCount[dk] < DESK_MAX };
+  }
+  loadAdvice() { return DEPT_KEYS.map(k => this.deptLoad(k)).filter(x => x.need); }
+  checkLoad() {
+    this.loadFlag ||= {};
+    for (const k of DEPT_KEYS) {
+      const L = this.deptLoad(k), was = !!this.loadFlag[k]; this.loadFlag[k] = L.need;
+      if (L.need && !was) { this.toast(`📈 ${DEPTS[k].name} kebanjiran tiket (${L.open} tiket untuk ${L.staff} orang). Disarankan rekrut karyawan baru!`, 'warn'); this.emit('sfx', 'alert'); this.emit('change'); }
+    }
+  }
+  betterCand(e) { const d = deptOfSpec(e.spec); return this.s.candidates.filter(c => deptOfSpec(c.spec) === d && c.skill >= e.skill + 12).sort((a, b) => b.skill - a.skill)[0] || null; }
   workRate(e, t) {
     const T = e.trait, base = (e.skill / 55) * 2.0 * (1 + (e.lvl - 1) * 0.05);
     const energyF = 0.45 + 0.55 * e.energy / 100, moodF = 0.65 + 0.35 * e.mood / 100;
@@ -262,6 +283,7 @@ export class Game {
   assign(taskId, empId) {
     const t = this.task(taskId), e = this.emp(empId);
     if (!t || !e || t.state !== 'new' || e.task || e.st === 'sick' || e.leaving || e.onLeave) return false;
+    if (!this.canDo(e, t)) { this.toast(`Tiket ini milik bidang ${DEPTS[deptOfSpec(t.spec)].name} — ${e.name.split(' ')[0]} dari bidang lain tidak bisa mengerjakannya.`, 'warn'); return false; }
     t.state = 'doing'; t.emp = e.id; e.task = t.id; this.s.stat.assigned++;
     if (e.act && e.act.arrived) { /* biarkan selesai istirahat dulu */ } else { this.cancelActivity(e); this.goWork(e); }
     this.emit('sfx', 'pop'); this.say(e, 'Siap, Bos! 💪'); this.face(e, 'happy', 2);
@@ -274,7 +296,7 @@ export class Game {
     if (e) { e.task = null; this.releaseWork(e); if (!(e.act && e.act.arrived)) this.goWork(e); }
   }
   autoPick(e) {
-    const c = this.s.tasks.filter(t => t.state === 'new');
+    const c = this.s.tasks.filter(t => t.state === 'new' && this.canDo(e, t));
     if (!c.length) return null;
     c.sort((a, b) => (this.matchFactor(e, b) - this.matchFactor(e, a)) || (a.deadline - b.deadline));
     return c[0];
@@ -581,7 +603,7 @@ export class Game {
         }
       }
     }
-    this.checkSuggest();
+    this.checkSuggest(); this.checkLoad();
     // drift stat harian
     const sv = this.facInfo('server');
     this.addStat('security', -1.2); if (sv && sv.sec) this.boost('security', sv.sec * 1.5);
@@ -665,10 +687,11 @@ export class Game {
   genCandidates() {
     const s = this.s, used = s.employees.map(e => e.name), list = [];
     const boost = Math.min(10, s.level);
-    const specs = [...SPEC_KEYS].sort(() => Math.random() - 0.5);
+    const needD = this.loadAdvice().map(x => x.dept);
+    const specs = [...SPEC_KEYS].sort(() => Math.random() - 0.5).sort((a, b) => needD.includes(deptOfSpec(b)) - needD.includes(deptOfSpec(a)));
     const fem = [Math.random() < 0.4, Math.random() < 0.4, Math.random() < 0.4]; if (fem.every(Boolean)) fem[Math.floor(Math.random() * 3)] = false;   // minimal 1 cowok
     for (let i = 0; i < 3; i++) { const c = makeEmployee(specs[i], rollRarity(boost), used, fem[i]); c.cost = r1(c.salary * 6); list.push(c); used.push(c.name); }
-    s.candidates = list;
+    s.candidates = list; this.checkSuggest();
   }
   rerollCandidates() {
     const cost = 1.5; if (this.s.money < cost) { this.toast('Dana tidak cukup 🥲', 'warn'); return false; }
@@ -704,6 +727,8 @@ export class Game {
     const f = e.fails || 0, sp = e.sp || 0;
     if (sp >= 3 || (sp >= 2 && f >= 1)) return { kind: 'fire', why: sp >= 3 ? 'sudah menerima SP 3×' : 'SP 2× dan kinerja masih buruk' };
     if (f >= 2) return { kind: 'sp', why: e.quirk === 'gosip' ? 'suka bergosip & kerja tersendat' : e.quirk === 'lambat' ? 'lambat kerja' : 'sering telat / banyak bug' };
+    const bc = this.betterCand(e), mates = this.s.employees.filter(x => !x.leaving && deptOfSpec(x.spec) === deptOfSpec(e.spec)).length;
+    if (bc && mates > 1 && (this.perfLevel(e) !== 'good' || bc.skill >= e.skill + 18)) return { kind: 'fire', why: `ada kandidat lebih pro: ${bc.name} (skill ${bc.skill} vs ${e.skill})` };
     return null;
   }
   checkSuggest() {
@@ -726,6 +751,7 @@ export class Game {
   fire(id) {
     const s = this.s, e = this.emp(id); if (!e || e.leaving) return false;
     if (s.employees.filter(x => !x.leaving).length <= 1) { this.toast('Minimal harus ada 1 karyawan di divisi 🥺', 'warn'); return false; }
+    if (s.employees.filter(x => !x.leaving && deptOfSpec(x.spec) === deptOfSpec(e.spec)).length <= 1) { this.toast(`Bidang ${DEPTS[deptOfSpec(e.spec)].name} harus punya minimal 1 karyawan. Rekrut pengganti dulu 🥺`, 'warn'); return false; }
     const c = this.fireCost(e); if (s.money < c) { this.toast(`Dana pesangon kurang (${fmtMoney(c)}) 🥲`, 'warn'); return false; }
     this.addMoney(-c);
     const meetProj = e.act && e.act.kind === 'meeting' ? e.act.proj : null;
