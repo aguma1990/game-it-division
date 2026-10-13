@@ -1,12 +1,12 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js';
-import { portrait, drawMochi } from './chibi.js';
-import { sfx, setSound, isSound } from './audio.js';
-import { playPatchRush } from './minigame.js';
-import { playFlappy, playRace, playCar } from './arcade.js';
-import { hasSave, clearSave } from './store.js';
-import { genLook, makeEmployee } from './game.js';
-import { NAMES_F, NAMES_M, SURNAMES } from './data.js';
+import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.2.2';
+import { portrait, drawMochi } from './chibi.js?v=4.2.2';
+import { sfx, setSound, isSound } from './audio.js?v=4.2.2';
+import { playPatchRush } from './minigame.js?v=4.2.2';
+import { playFlappy, playRace, playCar } from './arcade.js?v=4.2.2';
+import { hasSave, clearSave } from './store.js?v=4.2.2';
+import { genLook, makeEmployee } from './game.js?v=4.2.2';
+import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.2.2';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);

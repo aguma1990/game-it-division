@@ -1,8 +1,8 @@
 // Titik masuk: menyatukan Game, Scene, UI, penyimpanan, dan service worker.
-import { Game } from './game.js';
-import { Scene } from './scene.js';
-import { UI } from './ui.js';
-import { saveNow, loadSave } from './store.js';
+import { Game } from './game.js?v=4.2.2';
+import { Scene } from './scene.js?v=4.2.2';
+import { UI } from './ui.js?v=4.2.2';
+import { saveNow, loadSave } from './store.js?v=4.2.2';
 
 const game = new Game();
 const scene = new Scene(document.getElementById('scene'), game);

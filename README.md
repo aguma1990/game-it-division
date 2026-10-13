@@ -73,3 +73,6 @@ js/minigame.js  mini-game Patch Rush
 js/audio.js · js/store.js · js/main.js
 icons/          ikon PWA
 ```
+
+## Rilis & cache
+Setiap rilis jalankan `python3 bump.py <versi>` (mis. `python3 bump.py 4.2.3`). Skrip ini memasang `?v=<versi>` pada semua impor modul, CSS, dan service worker agar browser/HP tidak pernah memuat campuran file lama dan baru (penyebab layar hijau kosong).

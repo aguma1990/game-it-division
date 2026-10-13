@@ -1,5 +1,5 @@
 // Service worker: cache semua aset supaya game bisa dimainkan offline.
-const VERSION = 'neko-bank-it-v4.2.1';
+const VERSION = 'neko-bank-it-v4.2.2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/main.js', './js/game.js', './js/data.js', './js/events.js', './js/chibi.js', './js/iso.js', './js/scene.js',
@@ -18,7 +18,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
-      .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+    fetch(req, { cache: 'no-cache' }).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || (req.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
   );
 });
