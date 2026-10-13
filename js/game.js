@@ -38,7 +38,7 @@ const SCOLD_LINES = {
   semangat: ['Kamu pasti bisa! 💪', 'Saya percaya sama kamu.', 'Istirahat cukup, lalu gas lagi!']
 };
 const PROJECT_PHASES = [['ctrl', 'Analisis & kontrol', 75, 6.5], ['dev', 'Pengembangan', 100, 8.5], ['ops', 'Implementasi', 80, 7]];
-const TIME_SCALE = 0.62;         // memperlambat seluruh simulasi (1 hari ≈ 60 detik pada 1x)
+const TIME_SCALE = 0.62 / 3;         // memperlambat seluruh simulasi (1 hari ≈ 60 detik pada 1x)
 const WALK = 2.6;                // petak per detik
 
 export const deskPos = i => { const p = deskXY(i); return { x: p.x + 0.85, y: p.y - 0.5 }; };
@@ -140,7 +140,7 @@ export class Game {
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
       deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
-      week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false
+      week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: false, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false, autoV: 2, gems: 5, arcade: { day: 1, plays: 0, best: {} }, autoPaid: {}
     };
     this.initRuntime();
     for (let i = 0; i < 3; i++) this.spawnTask(['dev', 'ops', 'ctrl'][i], 'mid');
@@ -172,7 +172,9 @@ export class Game {
     for (const e of this.s.employees) if (e.quirk === undefined) e.quirk = rollQuirk();
     for (const k of ['approved', 'rejected', 'memos']) if (this.s.stat[k] === undefined) this.s.stat[k] = 0;
     if (!this.s.inbox) this.s.inbox = []; if (!this.s.memos) this.s.memos = []; if (this.s.coffeeStock === undefined) this.s.coffeeStock = 30; if (this.s.snackStock === undefined) this.s.snackStock = 24; if (this.s.fac.snack === undefined) this.s.fac.snack = 0; if (this.s.firstReq === undefined) this.s.firstReq = true;
-    const d = { auto: false, autoBreak: true, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false };
+    if (this.s.autoV !== 2) { this.s.autoV = 2; this.s.auto = false; this.s.autoBreak = false; }   // otomatisasi kini berbayar (permata / uang)
+    if (this.s.gems === undefined) this.s.gems = 5; if (!this.s.arcade) this.s.arcade = { day: this.s.day, plays: 0, best: {} }; if (!this.s.autoPaid) this.s.autoPaid = {};
+    const d = { auto: false, autoBreak: false, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false };
     for (const k in d) if (this.s[k] === undefined) this.s[k] = d[k];
     this.initRuntime();
     this.s.tasks.forEach(t => { if (t.state === 'doing' && !this.emp(t.emp)) { t.state = 'new'; t.emp = null; } });
@@ -250,7 +252,7 @@ export class Game {
       DESK_LEVELS.forEach((l, i) => { if (l === s.level && i >= 3) unlocks.push(`🪑 Meja kerja ke-${i + 1}`); });
       Object.values(DECOR).forEach(d => { if (d.lvl === s.level) unlocks.push(`${d.emoji} ${d.name}`); });
       this.addLog(`Naik level ${s.level}!`);
-      this.emit('levelup', { level: s.level, bonus, unlocks });
+      this.emit('levelup', { level: s.level, bonus, unlocks }); this.addGems(1);
       this.emit('sfx', 'levelup');
     }
   }
@@ -612,6 +614,52 @@ export class Game {
     else { e.x += dx / d * m; e.y += dy / d * m; if (Math.abs(dx - dy) > 0.01) e.flip = dx - dy >= 0 ? 1 : -1; }
   }
 
+  // ---------- Permata 💎, otomatisasi berbayar & arcade ----------
+  addGems(n, why) { this.s.gems = Math.max(0, (this.s.gems || 0) + n); if (n > 0) { this.s.stat.gems = (this.s.stat.gems || 0) + n; if (why) this.toast(`💎 +${n} permata${why ? ' · ' + why : ''}`, 'good'); } this.emit('change'); }
+  speedCost(t) { return Math.max(1, Math.ceil(Math.max(0, t.work - t.progress) / 40)); }
+  speedTask(id) {
+    const s = this.s, t = this.task(id); if (!t || t.state !== 'doing' || !t.emp) { this.toast('Tiket harus sedang dikerjakan karyawan untuk dipercepat.', 'warn'); return false; }
+    const c = this.speedCost(t); if ((s.gems || 0) < c) { this.toast(`Permata kurang (butuh ${c} 💎). Main Arcade untuk dapat permata!`, 'warn'); return false; }
+    s.gems -= c; t.progress = t.work; s.stat.speedups = (s.stat.speedups || 0) + 1;
+    const e = this.emp(t.emp); if (e) { this.say(e, 'Wah, kencang banget! ⚡', 2.5); this.face(e, 'excited', 3); this.emit('fx', { kind: 'stars', x: e.x, y: e.y }); }
+    this.emit('sfx', 'levelup2'); this.toast(`⚡ "${t.title}" dipercepat (−${c} 💎)`, 'good'); this.emit('change'); return true;
+  }
+  speedSystem(id) {
+    const s = this.s, v = s.sys[id]; if (!v || v.state !== 'testing') return false;
+    const c = 2 * v.left; if ((s.gems || 0) < c) { this.toast(`Permata kurang (butuh ${c} 💎)`, 'warn'); return false; }
+    s.gems -= c; this.toast(`⚡ Uji penerimaan dipercepat (−${c} 💎)`, 'good'); this.systemGoLive(id, 0.3); return true;
+  }
+  toggleAuto(k) {
+    const s = this.s; if (!['auto', 'autoBreak'].includes(k)) return;
+    s.autoPaid = s.autoPaid || {};
+    if (s[k]) { s[k] = false; this.toast(k === 'auto' ? '🤖 Auto-tugas dimatikan.' : '☕ Auto-istirahat dimatikan.', 'info'); this.emit('change'); return; }
+    if (s.autoPaid[k] !== s.day) {
+      if (k === 'auto') { if ((s.gems || 0) < 3) { this.toast('Auto-tugas butuh 3 💎 per hari. Main Arcade untuk dapat permata!', 'warn'); return; } s.gems -= 3; }
+      else { if (s.money < 50) { this.toast('Auto-istirahat butuh Rp 50 jt per hari. Kas belum cukup 🥲', 'warn'); return; } this.addMoney(-50); }
+      s.autoPaid[k] = s.day;
+    }
+    s[k] = true; this.emit('sfx', 'buy'); this.toast(k === 'auto' ? '🤖 Auto-tugas aktif (3 💎/hari).' : '☕ Auto-istirahat aktif (Rp 50 jt/hari).', 'good'); this.emit('change');
+  }
+  chargeAutos() {
+    const s = this.s; s.autoPaid = s.autoPaid || {};
+    if (s.auto) { if ((s.gems || 0) >= 3) { s.gems -= 3; s.autoPaid.auto = s.day; } else { s.auto = false; this.toast('🤖 Permata habis — Auto-tugas dimatikan. Main Arcade untuk dapat permata!', 'warn'); } }
+    if (s.autoBreak) { if (s.money >= 50) { this.addMoney(-50); s.autoPaid.autoBreak = s.day; this.addLog('Auto-istirahat −Rp 50 jt.'); } else { s.autoBreak = false; this.toast('☕ Kas kurang — Auto-istirahat dimatikan.', 'warn'); } }
+  }
+  arcadeLeft() { const a = this.s.arcade; return a.day === this.s.day ? Math.max(0, 5 - a.plays) : 5; }
+  arcadeCan(empId) {
+    const e = this.emp(empId); if (!e || e.leaving || e.hidden || e.onLeave) return { ok: false, why: 'tidak tersedia' };
+    if (this.arcadeLeft() <= 0) return { ok: false, why: 'jatah main hari ini habis (5×/hari)' };
+    if (e.st === 'sick') return { ok: false, why: 'sedang burnout' }; if (e.energy < 25) return { ok: false, why: 'terlalu lelah' };
+    return { ok: true };
+  }
+  arcadeRecord(empId, gameId, res) {
+    const s = this.s, a = s.arcade, e = this.emp(empId); if (a.day !== s.day) { a.day = s.day; a.plays = 0; }
+    a.plays++; if (gameId === 'race') a.best.race = Math.min(a.best.race || 9, res.score); else a.best[gameId] = Math.max(a.best[gameId] || 0, res.score);
+    if (e) { e.energy = clamp(e.energy - 14); e.mood = clamp(e.mood + 4); e.xp += 10 + res.gems * 4; this.face(e, res.gems ? 'happy' : 'smile', 3); }
+    s.stat.arcade = (s.stat.arcade || 0) + 1;
+    if (res.gems > 0) this.addGems(res.gems, `${e ? e.name.split(' ')[0] : ''} ${res.label}`); else this.emit('change');
+    this.checkMissions();
+  }
   // ---------- Upgrade sistem & keamanan ----------
   sysEff(id) { const v = this.s.sys[id]; return v && v.state === 'active' ? v.eff : 0; }
   sysBonus(key) { let t = 0; for (const [id, v] of Object.entries(this.s.sys || {})) if (v.state === 'active' && SYSTEMS[id][key]) t += SYSTEMS[id][key] * v.eff; return t; }
@@ -760,7 +808,7 @@ export class Game {
     // permintaan yang tak diputuskan sampai tenggat
     for (const r of [...s.inbox]) if (s.day >= r.deadline) this.expireRequest(r);
     // hari baru
-    s.day++; s.hour = 8; this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
+    s.day++; s.hour = 8; this.chargeAutos(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
     if (this.stars() >= 5) { s.starDays++; } else s.starDays = 0;
     // tiket baru
     const n = 1 + Math.floor(s.employees.length * 0.6) + (Math.random() < 0.4 ? 1 : 0);
@@ -959,7 +1007,7 @@ export class Game {
   visitEvaluate() {
     const s = this.s, score = 0.4 * this.avgMood() / 100 + 0.3 * s.service / 100 + 0.3 * (1 - s.risk / 100);
     if (score >= 0.7) { const b = r1(4 + s.level * 0.6); this.addMoney(b); this.addXp(70); this.boost('service', 2); s.employees.forEach(e => { e.mood = clamp(e.mood + 4); this.say(e, 'Direksi puas! 😄', 3); });
-      this.emit('banner', { text: '🏛️ Direksi Puas! ⭐', sub: `Apresiasi +${fmtMoney(b)}` }); this.emit('fx', { kind: 'confetti' }); this.emit('dir', { pose: 'cheer', text: 'Terima kasih, Direksi! 🙇', face: 'happy', dur: 3 }); this.toast(`🏛️ Direksi puas dengan kantor TI! Apresiasi ${fmtMoney(b)}.`, 'good'); }
+      this.addGems(2, 'Direksi puas'); this.emit('banner', { text: '🏛️ Direksi Puas! ⭐', sub: `Apresiasi +${fmtMoney(b)}` }); this.emit('fx', { kind: 'confetti' }); this.emit('dir', { pose: 'cheer', text: 'Terima kasih, Direksi! 🙇', face: 'happy', dur: 3 }); this.toast(`🏛️ Direksi puas dengan kantor TI! Apresiasi ${fmtMoney(b)}.`, 'good'); }
     else if (score >= 0.55) { this.addMoney(2); this.addXp(30); this.emit('dir', { pose: 'wave', text: 'Terima kasih atas kunjungannya 🙏', dur: 3 }); this.toast('🏛️ Direksi cukup puas. Apresiasi Rp 2 jt.', 'info'); }
     else { this.addStat('risk', 3); this.addStat('service', -2); s.employees.forEach(e => { e.mood = clamp(e.mood - 5); }); this.emit('dir', { pose: 'wave', text: 'Kami akan perbaiki… 😓', face: 'stress', dur: 3 }); this.toast('🏛️ Direksi kurang puas (mood tim, layanan & risiko perlu dibenahi).', 'bad'); }
     this.addLog('Evaluasi Direksi selesai.');
@@ -1336,6 +1384,7 @@ export class Game {
     this.emit('dir', { pose: 'cheer', text: 'GO-LIVE! 🎉', face: 'happy', dur: 3 }); this.emit('fx', { kind: 'confetti' }); this.emit('banner', { text: '🚀 GO-LIVE!', sub: `${p.name} · ${label} · +${fmtMoney(bonus)}` }); this.emit('sfx', 'levelup');
     this.toast(`🚀 ${p.name} resmi meluncur! ${label} — bonus ${fmtMoney(bonus)}`, 'good'); this.addLog(`Go-Live ${p.name} (${label}).`);
     if (incident) { this.addStat('service', -8); this.addStat('risk', 8); this.addMoney(-7 * this.costMul()); this.penalize(`Go-Live ${p.name} bermasalah (tidak siap)`, 5, 0.85, 7); this.toast(`💥 Go-Live ${p.name} bermasalah: bug produksi & rollback! Kinerja tim turun beberapa hari, biaya ${fmtMoney(7 * this.costMul())}.`, 'bad'); }
+    this.addGems(incident ? 1 : 3, `Go-Live ${p.name}`);
     if (hallParty) this.startParty(hallParty); else if (!s.fac.hall && !s.hallHint) { s.hallHint = true; this.toast('💡 Beli Ruang Aula di Toko untuk berpesta setelah proyek rilis!', 'info'); }
   }
 
@@ -1362,7 +1411,7 @@ export class Game {
   claimMission(id) {
     const m = MISSIONS.find(x => x.id === id), ms = this.s.missions[id];
     if (!m || !ms || !ms.done || ms.claimed) return;
-    ms.claimed = true; this.addMoney(m.money); if (m.xp) this.addXp(m.xp);
+    ms.claimed = true; this.addMoney(m.money); if (m.xp) this.addXp(m.xp); if (m.gems) this.addGems(m.gems);
     this.emit('sfx', 'coin'); this.toast(`Hadiah misi: +${fmtMoney(m.money)}${m.xp ? ` · +${m.xp} XP` : ''}`, 'good'); this.emit('change');
   }
 

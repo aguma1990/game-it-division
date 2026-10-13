@@ -341,3 +341,15 @@ body {
   #zoom { right: 450px; bottom: 20px; }
   #toasts { top: 84px; }
 }
+
+/* permata & arcade */
+.pill.gems { color: #7a4fd0; border-color: #d8c6ff; box-shadow: 0 2px 0 #c1a9f5; cursor: pointer; font-family: inherit; }
+.pill.gems.bump { animation: bump 0.4s; }
+@media (max-width: 1179px) { .pill.gems { font-size: 14px; padding: 8px 10px; } }
+.gem-big { font-size: 30px; font-weight: 900; color: #7a4fd0; }
+.arc-card .btn { min-width: 84px; }
+@media (max-width: 1179px) {
+  .hud-top { gap: 5px; } .pill.money { font-size: 13px; padding: 7px 7px; min-width: 0; } .pill.gems { font-size: 13px; padding: 7px 7px; flex: 0 0 auto; }
+  .dir-info { min-width: 0; } .dir-name b { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+  #nav { gap: 4px; padding-left: 6px; padding-right: 6px; } #nav button { min-width: 0; } #nav .nl { font-size: 9.5px; } #nav .ni { font-size: 18px; }
+}

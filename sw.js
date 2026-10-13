@@ -1,9 +1,9 @@
 // Service worker: cache semua aset supaya game bisa dimainkan offline.
-const VERSION = 'neko-bank-it-v3.10.2';
+const VERSION = 'neko-bank-it-v4.0.0';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/main.js', './js/game.js', './js/data.js', './js/events.js', './js/chibi.js', './js/iso.js', './js/scene.js',
-  './js/ui.js',  './js/audio.js', './js/minigame.js', './js/store.js',
+  './js/ui.js',  './js/audio.js', './js/minigame.js', './js/arcade.js', './js/store.js',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'
 ];
 

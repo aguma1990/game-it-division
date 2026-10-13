@@ -217,7 +217,7 @@ export const LEVEL_TITLES = ['Staf Magang', 'Staf TI', 'Ketua Tim', 'Kepala Seks
 export const xpNeeded = lvl => Math.round(1.5 * (120 + 90 * (lvl - 1) + 12 * (lvl - 1) * (lvl - 1)));
 
 export const MISSIONS = [
-  { id: 'm_appr', title: 'Setujui 3 permintaan di Inbox', desc: 'Buka tab Inbox dan putuskan permintaan karyawan.', need: 3, key: 'approved', money: 5, xp: 50 },
+  { id: 'm_appr', title: 'Setujui 3 permintaan di Inbox', desc: 'Buka tab Inbox dan putuskan permintaan karyawan.', need: 3, key: 'approved', gems: 1, money: 5, xp: 50 },
   { id: 'm_memo', title: 'Tulis memo pertamamu', desc: 'Beberapa permintaan butuh memo resmi darimu.', need: 1, key: 'memos', money: 4, xp: 40 },
   { id: 'm_assign', title: 'Tugaskan tiket pertama', desc: 'Buka tab Tugas, pilih tiket, lalu pilih karyawan.', need: 1, key: 'assigned', money: 3, xp: 30 },
   { id: 'm_done3', title: 'Selesaikan 3 tiket', desc: 'Tim kecilmu pasti bisa!', need: 3, key: 'tasksDone', money: 4, xp: 50 },
@@ -228,10 +228,10 @@ export const MISSIONS = [
   { id: 'm_ps', title: 'Beli Konsol PS', desc: 'Istirahat main game itu produktif (katanya).', need: 1, key: 'facPs', money: 6, xp: 60 },
   { id: 'm_mochi', title: 'Elus Mochi 10 kali', desc: 'Tap kucing putih yang keliling kantor.', need: 10, key: 'mochi', money: 3, xp: 40 },
   { id: 'm_psplay', title: 'Sesi main PS ×5', desc: 'Stres turun, mood naik.', need: 5, key: 'psPlays', money: 5, xp: 60 },
-  { id: 'm_pool', title: 'Buka Kolam Renang', desc: 'Tim butuh berendam setelah lembur!', need: 1, key: 'facPool', money: 12, xp: 110 },
-  { id: 'm_proj1', title: 'Go-Live proyek pertama', desc: 'Setujui proyek, rapat kick-off, lalu luncurkan!', need: 1, key: 'projects', money: 15, xp: 140 },
-  { id: 'm_proj3', title: 'Luncurkan 3 proyek', desc: 'Divisi TI jadi andalan Direksi.', need: 3, key: 'projects', money: 40, xp: 260 },
-  { id: 'm_scold', title: 'Bos Galak: marahi staf 3 kali', desc: 'Panggil staff ke ruangan lewat tab Tim (hati-hati, mereka bisa resign!).', need: 3, key: 'scolds', money: 6, xp: 60 },
+  { id: 'm_pool', title: 'Buka Kolam Renang', desc: 'Tim butuh berendam setelah lembur!', need: 1, key: 'facPool', gems: 2, money: 12, xp: 110 },
+  { id: 'm_proj1', title: 'Go-Live proyek pertama', desc: 'Setujui proyek, rapat kick-off, lalu luncurkan!', need: 1, key: 'projects', gems: 3, money: 15, xp: 140 },
+  { id: 'm_proj3', title: 'Luncurkan 3 proyek', desc: 'Divisi TI jadi andalan Direksi.', need: 3, key: 'projects', gems: 6, money: 40, xp: 260 },
+  { id: 'm_scold', title: 'Bos Galak: marahi staf 3 kali', desc: 'Panggil staff ke ruangan lewat tab Tim (hati-hati, mereka bisa resign!).', need: 3, key: 'scolds', gems: 1, money: 6, xp: 60 },
   { id: 'm_play', title: 'Buka Taman Bermain', desc: 'Kolam bola warna-warni menunggu!', need: 1, key: 'facPlay', money: 7, xp: 70 },
   { id: 'm_done10', title: 'Selesaikan 10 tiket', desc: 'Mulai jadi tim andalan bank.', need: 10, key: 'tasksDone', money: 8, xp: 90 },
   { id: 'm_lv5', title: 'Capai Level 5', desc: 'Jadi Kepala Bagian!', need: 5, key: 'level', money: 15, xp: 0 },
@@ -240,7 +240,7 @@ export const MISSIONS = [
   { id: 'm_mg', title: 'Menangkan Patch Rush', desc: 'Selesaikan mini-game saat ada insiden.', need: 1, key: 'mgWins', money: 8, xp: 80 },
   { id: 'm_star4', title: 'Rating bank 4 bintang', desc: 'Jaga layanan, keamanan, dan mood.', need: 4, key: 'stars', money: 12, xp: 120 },
   { id: 'm_day14', title: 'Bertahan sampai Hari ke-14', desc: 'Dua minggu penuh cerita!', need: 14, key: 'day', money: 10, xp: 100 },
-  { id: 'm_memo5', title: 'Tulis 5 memo', desc: 'Pemimpin yang baik rajin berkomunikasi.', need: 5, key: 'memos', money: 12, xp: 110 },
+  { id: 'm_memo5', title: 'Tulis 5 memo', desc: 'Pemimpin yang baik rajin berkomunikasi.', need: 5, key: 'memos', gems: 2, money: 12, xp: 110 },
   { id: 'm_done30', title: 'Selesaikan 30 tiket', desc: 'Divisi TI makin tangguh.', need: 30, key: 'tasksDone', money: 18, xp: 160 },
   { id: 'm_lv10', title: 'Capai Level 10', desc: 'CIO Legendaris!', need: 10, key: 'level', money: 60, xp: 0 },
   { id: 'm_star5', title: 'Rating bank 5 bintang', desc: 'Divisi TI terbaik se-Nusantara!', need: 5, key: 'stars', money: 40, xp: 300 }

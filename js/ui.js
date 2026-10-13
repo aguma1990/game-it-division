@@ -3,15 +3,16 @@ import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIO
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
+import { playFlappy, playRace, playPole } from './arcade.js';
 import { hasSave, clearSave } from './store.js';
-import { genLook } from './game.js';
+import { genLook, makeEmployee } from './game.js';
 import { NAMES_F, NAMES_M, SURNAMES } from './data.js';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
-const TITLES = { inbox: '📥 Inbox Persetujuan', tasks: '📋 Tiket Tugas', team: '👥 Tim Divisi TI', shop: '🛍️ Toko Kantor', missions: '🎯 Misi & Jurnal' };
+const TITLES = { inbox: '📥 Inbox Persetujuan', tasks: '📋 Tiket Tugas', team: '👥 Tim Divisi TI', shop: '🛍️ Toko Kantor', missions: '🎯 Misi & Jurnal', arcade: '🎮 Arcade Kantor' };
 
 export const DIR_LOOKS = [
   { female: false, hair: '#2b1b14', style: 'wavy', bangs: 0, eye: '#5a3320', skin: '#f8d2b4', skirt: false, acc: 'none' },
@@ -66,7 +67,7 @@ export class UI {
     const s = this.g.s; setSound(s.sound);
     this.layout();
     this.dirImg = '';
-    this.hud(true);
+    this.hud(true); $('#gems').onclick = () => { sfx('tap'); this.openTab('arcade'); };
     if (this.desktop.matches) this.openTab('tasks'); else this.closePanel();
   }
 
@@ -121,16 +122,65 @@ export class UI {
     this.sig = view.sig; body.innerHTML = view.html; body.scrollTop = top; this.updateDyn();
   }
 
+  // ----- Tab Arcade (permainan berhadiah permata) -----
+  arcadeView() {
+    const g = this.g, s = g.s, left = g.arcadeLeft(), best = s.arcade.best || {};
+    const sig = 'A' + (s.gems || 0) + left + JSON.stringify(best) + s.employees.map(e => Math.round(e.energy / 10)).join('');
+    const games = [
+      ['flappy', '🐤', 'Terbang Menembus Firewall', 'Ketuk untuk mengepak & lewati celah firewall. Tiap 3 firewall = 1 💎 (maks 6).', best.flappy ? `Rekor: ${best.flappy} firewall` : 'Belum pernah main'],
+      ['race', '🏃', 'Lomba Lari Kantor', 'Ketuk secepat mungkin! Juara 1 = 5 💎, juara 2 = 3, juara 3 = 2, juara 4 = 1.', best.race ? `Terbaik: juara ${best.race}` : 'Belum pernah main'],
+      ['pole', '🎋', 'Panjat Pinang', 'Panjat batang licin sampai puncak sebelum waktu habis. Sampai puncak = 5–6 💎.', best.pole ? `Rekor: ${best.pole}%` : 'Belum pernah main']
+    ];
+    const html = `<div class="card" style="text-align:center"><div class="gem-big">💎 ${s.gems || 0}</div><div class="t-sub" style="font-weight:800">Jatah main hari ini: <b>${left}/5</b> · tiap main −14 ⚡ energi & +4 💚 mood karyawan</div>
+      <div class="t-sub" style="margin-top:6px">Gunakan permata untuk <b>⚡ Percepat tiket/proyek</b> (di tab Tugas), <b>🤖 Auto-tugas</b> (3 💎/hari), dan percepat uji sistem. Permata juga didapat dari Go-Live, misi, naik level & Direksi puas.</div></div>
+      ${games.map(([id, ico, name, desc, rec]) => `<div class="card arc-card"><div class="row"><div class="shop-ico">${ico}</div><div class="grow"><div class="t-title">${name}</div><div class="t-sub">${desc}</div><div class="chips"><span class="chip">🏆 ${rec}</span></div></div>
+        <button class="btn sm" data-act="arc" data-k="${id}" ${left <= 0 || !s.employees.length ? 'disabled' : ''}>Main!</button></div></div>`).join('')}`;
+    return { html, sig };
+  }
+  showArcadePick(gameId) {
+    const g = this.g, s = g.s, names = { flappy: 'Terbang Menembus Firewall', race: 'Lomba Lari Kantor', pole: 'Panjat Pinang' };
+    const list = [...s.employees].filter(e => !e.leaving).map(e => ({ e, c: g.arcadeCan(e.id) })).sort((a, b) => b.c.ok - a.c.ok || b.e.energy - a.e.energy);
+    const root = this.openModal(`<div class="big-emoji">🎮</div><h2>${names[gameId]}</h2><p>Pilih karyawan yang bermain (energi tinggi = lebih jago).</p>
+      <div class="sel-list" style="max-height:44dvh;overflow:auto">${list.map(({ e, c }) => `<button class="sel-item" data-id="${e.id}" ${c.ok ? '' : 'disabled'}><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'excited', 40)}" alt=""></div>
+        <div class="grow" style="text-align:left"><div class="t-title">${esc(e.name)}</div><div class="t-sub">${DEPTS[deptOfSpec(e.spec)].emoji} ${SPECS[e.spec].name} · ⚡${Math.round(e.energy)}${TRAITS[e.trait] ? ' · ' + TRAITS[e.trait].emoji : ''}</div></div><span class="chip ${c.ok ? 'money' : 'warn'}">${c.ok ? 'Main' : esc(c.why)}</span></button>`).join('')}</div>
+      <button class="btn ghost block" style="margin-top:10px" data-close>Batal</button>`);
+    root.addEventListener('click', ev => {
+      if (ev.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); return; }
+      const b = ev.target.closest('.sel-item'); if (!b || b.disabled) return;
+      this.runArcade(gameId, b.dataset.id);
+    });
+  }
+  runArcade(gameId, empId) {
+    const g = this.g, emp = g.emp(empId); if (!emp) return;
+    this.closeModal();
+    const others = g.s.employees.filter(e => e.id !== empId && !e.leaving);
+    const root = this.openModal('<div id="aHost"></div>'), host = root.querySelector('#aHost');
+    let p;
+    if (gameId === 'flappy') p = playFlappy(host, { emp });
+    else if (gameId === 'race') {
+      const rivals = [...others].sort(() => Math.random() - 0.5).slice(0, 4);
+      while (rivals.length < 4) { const sp = ['dev', 'ops', 'ctrl', 'sec', 'dba', 'pm'][rivals.length % 6], r = makeEmployee(sp, 'N', [...g.s.employees.map(x => x.name), ...rivals.map(x => x.name)]); r.skill = 40 + Math.floor(Math.random() * 35); rivals.push(r); }
+      p = playRace(host, { emp, rivals });
+    } else p = playPole(host, { emp, cheerers: [...others].sort(() => Math.random() - 0.5).slice(0, 2) });
+    p.then(res => {
+      this.closeModal(); g.arcadeRecord(empId, gameId, res); sfx(res.gems ? 'win' : 'lose');
+      const r2 = this.openModal(`<div class="big-emoji">${res.gems ? '💎' : '🥲'}</div><h2>${res.gems ? `+${res.gems} Permata!` : 'Belum beruntung…'}</h2><p>${esc(emp.name)} ${esc(res.label)}.<br>Jatah main hari ini: ${g.arcadeLeft()}/5</p>
+        <button class="btn block" id="arAgain" ${g.arcadeLeft() > 0 ? '' : 'disabled'}>🔁 Main lagi</button><button class="btn ghost block" style="margin-top:8px" data-close>Selesai</button>`);
+      r2.addEventListener('click', ev => { if (ev.target.closest('[data-close]')) { this.closeModal(); this.render(true); this.hud(true); } else if (ev.target.closest('#arAgain')) { this.closeModal(); this.showArcadePick(gameId); } });
+      this.render(true); this.hud(true);
+    });
+  }
+
   // ----- Tab Tugas -----
   tasksView() {
     const g = this.g, s = g.s;
     const order = { doing: 0, done: 1, new: 2 };
     const tasks = [...s.tasks].sort((a, b) => order[a.state] - order[b.state] || a.deadline - b.deadline);
     const adv = g.loadAdvice().map(x => x.dept + x.open + x.staff).join(',') + DEPT_KEYS.map(k => g.deptLoad(k).open + ':' + g.deptLoad(k).staff).join(',');
-    const sig = 'T' + s.day + (s.debuff ? s.debuff.left : '') + Math.round(s.money * 2) + s.employees.length + (s.debt || 0) + (s.econ ? s.econ.id + s.econ.left : '') + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
+    const sig = 'T' + s.day + (s.gems || 0) + (s.debuff ? s.debuff.left : '') + Math.round(s.money * 2) + s.employees.length + (s.debt || 0) + (s.econ ? s.econ.id + s.econ.left : '') + adv + (s.auto ? 'a' : '') + (s.autoBreak ? 'b' : '') + tasks.map(t => t.id + t.state + (t.emp || '') + t.late + (g.emps.some(e => !e.task && e.st !== 'sick') ? 'i' : '')).join(',');
     let html = `<div class="toggles">
-      <button class="tog ${s.auto ? 'on' : ''}" data-act="toggle" data-k="auto"><span class="sw"></span>🤖 Auto-tugas</button>
-      <button class="tog ${s.autoBreak ? 'on' : ''}" data-act="toggle" data-k="autoBreak"><span class="sw"></span>☕ Auto-istirahat</button></div>`;
+      <button class="tog ${s.auto ? 'on' : ''}" data-act="toggle" data-k="auto"><span class="sw"></span>🤖 Auto-tugas<small style="display:block;font-size:10px;opacity:0.8">3 💎 / hari</small></button>
+      <button class="tog ${s.autoBreak ? 'on' : ''}" data-act="toggle" data-k="autoBreak"><span class="sw"></span>☕ Auto-istirahat<small style="display:block;font-size:10px;opacity:0.8">Rp 50 jt / hari</small></button></div>`;
     const ec = g.econInfo(), di = g.diffInfo(), cost = g.dailyCost(), rw = g.runway();
     html += `<div class="card" style="border-left:7px solid ${rw < 3 ? '#e5484d' : rw < 7 ? '#e0a100' : '#2fae6a'}"><div class="t-title">💰 Keuangan <span class="chip">${di.emoji} ${di.name}</span></div>
       <div class="kv" style="margin-top:6px"><span>Kas</span><b class="${s.money < 0 ? 'r' : ''}">${fmtMoney(s.money)}</b><span>Biaya tetap / hari</span><b>${fmtMoney(cost)}</b><span>↳ gaji + operasional${s.debt ? ' + cicilan' : ''}</span><b>${fmtMoney(g.salaryTotal())} + ${fmtMoney(g.overhead())}${s.debt ? ' + ' + fmtMoney(g.debtPay()) : ''}</b><span>Kas cukup untuk</span><b class="${rw < 3 ? 'r' : ''}">${rw} hari tanpa pemasukan</b>${s.debt ? `<span>🏦 Utang</span><b class="r">${fmtMoney(s.debt)}</b>` : ''}</div>
@@ -150,7 +200,7 @@ export class UI {
       const e = t.emp ? g.emp(t.emp) : null;
       let act = '';
       if (t.state === 'new') act = `<button class="btn sm" data-act="assign" data-id="${t.id}">👉 Tugaskan</button>`;
-      else if (t.state === 'doing' && e) act = `<div class="row" style="margin-top:8px"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'focus', 40)}" alt=""></div><div class="grow"><div class="t-sub" style="margin:0">${esc(e.name)} sedang mengerjakan…</div>${this.bar('pr', 'tp:' + t.id, clamp(t.progress / t.work * 100))}</div><button class="btn ghost sm" data-act="unassign" data-id="${t.id}">Batal</button></div>`;
+      else if (t.state === 'doing' && e) act = `<button class="btn gold sm" style="float:right;margin-top:6px" data-act="speed" data-id="${t.id}" ${(s.gems || 0) < g.speedCost(t) ? 'disabled' : ''}>⚡ Percepat<br><small>💎 ${g.speedCost(t)}</small></button><div class="row" style="margin-top:8px"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'focus', 40)}" alt=""></div><div class="grow"><div class="t-sub" style="margin:0">${esc(e.name)} sedang mengerjakan…</div>${this.bar('pr', 'tp:' + t.id, clamp(t.progress / t.work * 100))}</div><button class="btn ghost sm" data-act="unassign" data-id="${t.id}">Batal</button></div>`;
       else if (t.state === 'done') act = `<button class="btn gold sm" data-act="claim" data-id="${t.id}">🎉 Klaim ${t.q === 'perfect' ? '✨ Sempurna!' : ''}</button>`;
       const TD = DEPTS[deptOfSpec(t.spec)];
       html += `<div class="card ${t.state === 'done' ? 'done' : ''}" style="border-left:7px solid ${TD.color}">
@@ -251,7 +301,7 @@ export class UI {
   shopView() {
     const g = this.g, s = g.s;
     const tot = g.totalDesks(), nxD = tot < 27 ? { cost: DESK_COSTS[tot], lvl: DESK_LEVELS[tot] } : null;
-    const sig = 'S' + this.focus + s.level + '|' + JSON.stringify(s.sys) + Math.floor(s.money / 5) + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
+    const sig = 'S' + this.focus + s.level + (s.gems || 0) + '|' + JSON.stringify(s.sys) + Math.floor(s.money / 5) + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
     let html = `<div class="sec-title"><span>Fasilitas</span></div>`;
     for (const [k, F] of Object.entries(FACILITIES)) {
       const lv = s.fac[k], cur = lv ? F.levels[lv - 1] : null, nx = g.nextFac(k);
@@ -266,7 +316,7 @@ export class UI {
     html += `<div class="sec-title"><span>🛡️ Upgrade Sistem & Keamanan (mahal, dipasang bertahap)</span></div><div class="t-sub" style="margin:0 4px 6px;font-weight:700">Beli → staf mengerjakan tiket pemasangan di tab Tugas → uji & aktifkan. Pemasangan asal-asalan (staf lemah, telat, tanpa uji) bisa gagal dan bikin kinerja tim turun.</div>`;
     for (const [id, S] of Object.entries(SYSTEMS)) {
       const v = s.sys[id], c = g.sysCanBuy(id);
-      const st = v ? (v.state === 'active' ? `<span class="chip money">✅ Aktif · efektivitas ${Math.round(v.eff * 100)}%</span>` : v.state === 'testing' ? `<span class="chip">🧪 Uji penerimaan (${v.left} hari)</span>` : v.state === 'ready' ? `<span class="chip warn">📥 Menunggu keputusan aktivasi di Inbox</span>` : `<span class="chip">🛠️ Tahap ${v.step + 1}/${S.steps.length}: ${esc(S.steps[Math.min(v.step, S.steps.length - 1)][1])} · kualitas ${v.q.toFixed(1)}</span>`) : '';
+      const st = v ? (v.state === 'active' ? `<span class="chip money">✅ Aktif · efektivitas ${Math.round(v.eff * 100)}%</span>` : v.state === 'testing' ? `<span class="chip">🧪 Uji penerimaan (${v.left} hari)</span><button class="btn gold sm" data-act="speedsys" data-k="${id}" ${(s.gems || 0) < 2 * v.left ? 'disabled' : ''}>⚡ Percepat 💎${2 * v.left}</button>` : v.state === 'ready' ? `<span class="chip warn">📥 Menunggu keputusan aktivasi di Inbox</span>` : `<span class="chip">🛠️ Tahap ${v.step + 1}/${S.steps.length}: ${esc(S.steps[Math.min(v.step, S.steps.length - 1)][1])} · kualitas ${v.q.toFixed(1)}</span>`) : '';
       html += `<div class="card ${!v && !c.ok && !c.money ? 'locked' : ''}"><div class="row"><div class="shop-ico">${S.emoji}</div>
         <div class="grow"><div class="t-title">${S.name}</div><div class="t-sub">${S.desc}</div>
         <div class="chips" style="margin-top:4px"><span class="chip money">💰 ${fmtMoney(S.cost)}</span><span class="chip">🧾 ${fmtMoney(S.upkeep)}/hari</span><span class="chip">🔒 Lv.${S.lvl}</span><span class="chip">👥 ${[...new Set(S.steps.map(x => DEPTS[deptOfSpec(x[0])].name))].join(' + ')}</span>${st}</div>
@@ -300,7 +350,7 @@ export class UI {
       html += `<div class="card ${ms.done && !ms.claimed ? 'done' : ''}" style="${ms.claimed ? 'opacity:.55' : ''}"><div class="row"><div class="ico" style="background:${ms.claimed ? '#b8e6cc' : ms.done ? '#ffc23d' : '#c9b4ff'}">${ms.claimed ? '✅' : ms.done ? '🎁' : '🎯'}</div>
         <div class="grow"><div class="t-title">${m.title}</div><div class="t-sub">${m.desc}</div>
         <div class="prog-line"><div class="bar pr"><i style="width:${pct.toFixed(0)}%"></i></div>${Math.min(v, m.need)}/${m.need}</div>
-        <div class="chips"><span class="chip money">💰 ${fmtMoney(m.money)}</span>${m.xp ? `<span class="chip xp">⭐ ${m.xp} XP</span>` : ''}</div></div>
+        <div class="chips"><span class="chip money">💰 ${fmtMoney(m.money)}</span>${m.gems ? `<span class="chip" style="color:#7a4fd0;font-weight:900">💎 ${m.gems}</span>` : ''}${m.xp ? `<span class="chip xp">⭐ ${m.xp} XP</span>` : ''}</div></div>
         ${ms.done && !ms.claimed ? `<button class="btn gold sm" data-act="claimm" data-id="${m.id}">Klaim!</button>` : ''}</div></div>`;
     }
     html += `<div class="sec-title"><span>📖 Jurnal kantor</span></div><div class="log">${s.log.slice(0, 14).map(l => `<div>${esc(l)}</div>`).join('') || '<div>Belum ada cerita.</div>'}</div>`;
@@ -312,7 +362,10 @@ export class UI {
     const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
     const g = this.g, id = b.dataset.id, k = b.dataset.k;
     switch (b.dataset.act) {
-      case 'toggle': g.s[k] = !g.s[k]; sfx('tap'); break;
+      case 'toggle': sfx('tap'); g.toggleAuto(k); break;
+      case 'speed': g.speedTask(id); break;
+      case 'speedsys': g.speedSystem(k); break;
+      case 'arc': sfx('tap'); this.showArcadePick(k); return;
       case 'goteam': sfx('tap'); this.openTab('team'); return;
       case 'approve': g.resolveRequest(id, 'approve', k); break;
       case 'reject': g.resolveRequest(id, 'reject'); break;
@@ -364,6 +417,7 @@ export class UI {
     const key = JSON.stringify(s.dirLook); if (this.dirKey !== key) { this.dirKey = key; $('#dirAvatar').src = portrait(s.dirLook, 'dir', 'happy', 64); }
     const need = xpNeeded(s.level); $('#xpFill').style.width = clamp(s.xp / need * 100) + '%'; $('#xpText').textContent = `${Math.floor(s.xp)}/${need} XP`;
     const st = g.stars(); $('#stars').textContent = '★'.repeat(st) + '☆'.repeat(5 - st); $('#stars').style.color = '#ffb400';
+    { const gm = $('#gems'), gt = '💎 ' + (s.gems || 0); if (gm.textContent !== gt) { if ((s.gems || 0) > (this.lastGems || 0)) { gm.classList.remove('bump'); void gm.offsetWidth; gm.classList.add('bump'); } gm.textContent = gt; this.lastGems = s.gems || 0; } $('#dotArcade').classList.toggle('on', g.arcadeLeft() > 0 && (s.gems || 0) < 3); }
     const mEl = $('#money'); const txt = fmtMoney(s.money); if (mEl.textContent !== txt) { if (s.money > this.lastMoney) { mEl.classList.remove('bump'); void mEl.offsetWidth; mEl.classList.add('bump'); } mEl.textContent = txt; } this.lastMoney = s.money;
     mEl.style.color = s.money < 5 ? '#e5484d' : '';
     const h = Math.floor(s.hour), m = Math.floor((s.hour - h) * 60 / 10) * 10;
