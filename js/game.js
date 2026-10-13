@@ -2,9 +2,9 @@
 import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
-  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL
-} from './data.js?v=4.3.2';
-import { EVENTS } from './events.js?v=4.3.2';
+  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL, BANKRUPT_LIMIT
+} from './data.js?v=4.3.3';
+import { EVENTS } from './events.js?v=4.3.3';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
@@ -864,6 +864,12 @@ export class Game {
   debtPay() { return Math.min(this.s.debt || 0, 2.5); }
   dailyCost() { return r1(this.salaryTotal() + this.overhead() + this.debtPay()); }
   runway() { const c = this.dailyCost(); return c > 0 ? Math.max(0, Math.floor(this.s.money / c)) : 99; }
+  // Kas di bawah batas bangkrut (−30 jt): pakai pinjaman darurat bila masih ada jatah, kalau tidak → BANGKRUT
+  checkSolvency() {
+    const s = this.s; if (s.ended || s.money >= BANKRUPT_LIMIT) return false;
+    if (s.bailouts < this.diffInfo().bail) { s.bailouts++; s.money = r1(s.money + 25); s.debt = r1((s.debt || 0) + 32); s.risk = clamp(s.risk + 8); this.addStat('service', -6); this.toast('🏦 Pinjaman darurat Rp 25 jt dari kantor pusat (utang Rp 32 jt, dicicil Rp 2,5 jt/hari). Hati-hati! 😰', 'warn'); this.addLog('Pinjaman darurat dari kantor pusat.'); this.emit('sfx', 'oops'); return false; }
+    this.bankrupt(`kas mencapai ${fmtMoney(s.money)} (batas bangkrut ${fmtMoney(BANKRUPT_LIMIT)}) dan tidak ada lagi dana darurat`); return true;
+  }
   bankrupt(why) {
     const s = this.s; if (s.ended) return; s.ended = true; s.speed = 0; this.blocking = true;
     this.emit('sfx', 'lose'); this.addLog('BANGKRUT: ' + why);
@@ -881,10 +887,7 @@ export class Game {
     this.toast(`📉 Biaya hari ini: gaji ${fmtMoney(salary)} + operasional ${fmtMoney(over)}${pay ? ` + cicilan ${fmtMoney(pay)}` : ''}${tax ? ` + pajak ${fmtMoney(tax)}` : ''}`, 'info');
     if (s.money < 0) {
       s.employees.forEach(e => e.mood = clamp(e.mood - 12));
-      if (s.money < -15) {
-        if (s.bailouts < this.diffInfo().bail) { s.bailouts++; s.money = r1(s.money + 25); s.debt = r1((s.debt || 0) + 32); s.risk = clamp(s.risk + 8); this.addStat('service', -6); this.toast('🏦 Pinjaman darurat Rp 25 jt dari kantor pusat (utang Rp 32 jt, dicicil Rp 2,5 jt/hari). Hati-hati! 😰', 'warn'); this.addLog('Pinjaman darurat dari kantor pusat.'); }
-        else { this.bankrupt(`kas habis (${fmtMoney(s.money)}) dan tidak ada lagi dana darurat`); return; }
-      }
+      if (this.checkSolvency()) return;
     } else if (s.money < this.dailyCost() * 2) this.toast('⚠️ Kas tipis! Biaya harian hampir menghabiskan sisa dana.', 'warn');
     // kondisi ekonomi berganti
     if (s.econ) { s.econ.left--; if (s.econ.left <= 0) { s.econ = null; this.toast('🌤️ Kondisi ekonomi kembali normal.', 'info'); } }
@@ -1164,7 +1167,7 @@ export class Game {
   }
   tickDaily(dt) {
     const s = this.s, L = s.lunch;
-    this._jT = (this._jT || 0) + dt; if (this._jT > 2) { this._jT = 0; this.janitor(); }
+    this._jT = (this._jT || 0) + dt; if (this._jT > 2) { this._jT = 0; this.janitor(); if (this.checkSolvency()) return; }
     this._rsT = (this._rsT || 0) + dt; if (this._rsT > 3) { this._rsT = 0; this.ensureRestock(); }
     if (L.day !== s.day) { s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 }; return; }
     if (this.party && !s.employees.some(e => e.act && e.act.kind === 'party')) this.party = null;

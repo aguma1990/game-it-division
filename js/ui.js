@@ -1,12 +1,12 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.2';
-import { portrait, drawMochi } from './chibi.js?v=4.3.2';
-import { sfx, setSound, isSound } from './audio.js?v=4.3.2';
-import { playPatchRush } from './minigame.js?v=4.3.2';
-import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.2';
-import { hasSave, clearSave } from './store.js?v=4.3.2';
-import { genLook, makeEmployee } from './game.js?v=4.3.2';
-import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.2';
+import { BANKRUPT_LIMIT, QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.3';
+import { portrait, drawMochi } from './chibi.js?v=4.3.3';
+import { sfx, setSound, isSound } from './audio.js?v=4.3.3';
+import { playPatchRush } from './minigame.js?v=4.3.3';
+import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.3';
+import { hasSave, clearSave } from './store.js?v=4.3.3';
+import { genLook, makeEmployee } from './game.js?v=4.3.3';
+import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.3';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);
@@ -188,7 +188,7 @@ export class UI {
       <div class="kv" style="margin-top:6px"><span>Kas</span><b class="${s.money < 0 ? 'r' : ''}">${fmtMoney(s.money)}</b><span>Biaya tetap / hari</span><b>${fmtMoney(cost)}</b><span>↳ gaji + operasional${s.debt ? ' + cicilan' : ''}</span><b>${fmtMoney(g.salaryTotal())} + ${fmtMoney(g.overhead())}${s.debt ? ' + ' + fmtMoney(g.debtPay()) : ''}</b><span>Kas cukup untuk</span><b class="${rw < 3 ? 'r' : ''}">${rw} hari tanpa pemasukan</b>${s.debt ? `<span>🏦 Utang</span><b class="r">${fmtMoney(s.debt)}</b>` : ''}</div>
       ${s.debuff && s.debuff.left > 0 ? `<div class="t-sub" style="margin-top:6px;font-weight:900;color:#c0392b">⚠️ Kinerja tim turun ${Math.round((1 - s.debuff.mult) * 100)}% (${s.debuff.left} hari lagi): ${esc(s.debuff.why)}</div>` : ''}
       ${ec ? `<div class="t-sub" style="margin-top:6px;font-weight:800">${ec.emoji} ${ec.name} (${s.econ.left} hari lagi): ${ec.desc}</div>` : ''}${s.surcharge ? `<div class="t-sub" style="font-weight:800">🏷️ Kenaikan biaya vendor +${fmtMoney(s.surcharge.amt)}/hari (${s.surcharge.left} hari)</div>` : ''}
-      <div class="t-sub" style="margin-top:4px">Pajak mingguan tiap 7 hari · ${di.bail >= 99 ? 'dana darurat tak terbatas' : di.bail ? 'sisa dana darurat: ' + Math.max(0, di.bail - (s.bailouts || 0)) + '×' : 'tanpa dana darurat — kas < −15 jt = bangkrut'}.</div></div>
+      <div class="t-sub" style="margin-top:4px">Pajak mingguan tiap 7 hari · ${di.bail >= 99 ? 'dana darurat tak terbatas' : di.bail ? 'sisa dana darurat: ' + Math.max(0, di.bail - (s.bailouts || 0)) + '×' : 'tanpa dana darurat'}.<br><b style="color:${s.money < -10 ? '#c0392b' : 'inherit'}">🚨 Batas bangkrut: kas ≤ ${fmtMoney(BANKRUPT_LIMIT)}${s.money < 0 ? ` (sekarang ${fmtMoney(s.money)})` : ''}</b></div></div>
     <div class="card"><div class="t-title">📊 Beban kerja per bidang</div>${DEPT_KEYS.map(k => {
       const L = g.deptLoad(k), D = DEPTS[k], pct = Math.min(100, L.per / 3.2 * 100), lv = { high: ['#e5484d', '🔴 Kewalahan'], mid: ['#e0a100', '🟡 Sibuk'], low: ['#2fae6a', '🟢 Santai'] }[L.level];
       return `<div style="margin-top:8px"><div class="t-sub" style="display:flex;justify-content:space-between;font-weight:800"><span style="color:#1f3a2e">${D.emoji} ${D.name}</span><span style="color:${lv[0]}">${lv[1]}</span></div>

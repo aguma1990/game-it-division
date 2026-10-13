@@ -194,11 +194,12 @@ export const SYSTEMS = {
   core:   { name: 'Modernisasi Core Banking', emoji: '🏛️', cost: 420, lvl: 12, upkeep: 4.5, steps: [['dba', 'Migrasi data core', 200], ['dev', 'Re-platform modul inti', 240], ['ops', 'Cut-over & stabilisasi', 160]], income: 0.12, svc: 0.3, desc: 'Fondasi bank modern. Pendapatan +12%, tapi proyek raksasa!' }
 };
 // Tingkat kesulitan & kondisi ekonomi: bikin kas mudah menipis, dan kebangkrutan bisa terjadi
+export const BANKRUPT_LIMIT = -30;     // kas ≤ −Rp 30 jt = kategori bangkrut
 export const DIFFS = {
   easy:   { name: 'Santai',  emoji: '🌱', income: 1.1,  over: 0.7, evt: 0.7, bail: 99, desc: 'Biaya ringan, dana darurat tak terbatas. Cocok untuk santai.' },
   normal: { name: 'Normal',  emoji: '⚖️', income: 1,    over: 1,   evt: 1,   bail: 2,  desc: 'Biaya operasional nyata & 2× dana darurat (berutang).' },
   hard:   { name: 'Sulit',   emoji: '🔥', income: 0.9,  over: 1.35, evt: 1.4, bail: 1,  desc: 'Biaya tinggi, insiden mahal, hanya 1× dana darurat.' },
-  hell:   { name: 'Neraka',  emoji: '💀', income: 0.8,  over: 1.7, evt: 1.8, bail: 0,  desc: 'Tanpa dana darurat. Kas < −15 jt = BANGKRUT!' }
+  hell:   { name: 'Neraka',  emoji: '💀', income: 0.8,  over: 1.7, evt: 1.8, bail: 0,  desc: 'Tanpa dana darurat. Kas < −30 jt = BANGKRUT!' }
 };
 export const ECONS = {
   resesi:   { name: 'Resesi', emoji: '📉', reward: 0.78, over: 1, days: 6, desc: 'Nasabah menahan belanja: imbalan tiket −22%.' },
