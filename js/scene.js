@@ -1,8 +1,8 @@
 // Scene Canvas isometrik: kamera (geser/zoom), karyawan, Mochi, partikel, gelembung, hit-test.
-import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, DEPTS, deptOfSpec, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js?v=4.2.2';
-import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js?v=4.2.2';
-import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js?v=4.2.2';
-import * as I from './iso.js?v=4.2.2';
+import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, DEPTS, deptOfSpec, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js?v=4.3.0';
+import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js?v=4.3.0';
+import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js?v=4.3.0';
+import * as I from './iso.js?v=4.3.0';
 
 const TAU = Math.PI * 2;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -398,6 +398,11 @@ export class Scene {
     };
     if (s.fac.coffee && s.coffeeStock <= 0) { const [cx, cy] = P(2.0, 0.6, 118); I.tag(ctx, cx, cy, '☕ Stok habis! → Inbox', t, '#e5484d'); this.hits.push({ type: 'room', kind: 'inbox', x0: cx - 70, x1: cx + 70, y0: cy - 16, y1: cy + 20, pri: 7 }); }
     tagFor('pool', 24.0, 4.2, 70);
+    for (const [k, gx, gy, z] of [['server', 9.2, 12.2, 120], ['coffee', 2.0, 0.6, 140], ['snack', 0.65, 1.95, 126], ['ps', 12.0, 0.2, 160], ['play', 13.4, 12.4, 64], ['pool', 24.0, 4.2, 96]]) {
+      if (!s.fac[k]) continue; const a = s.assets && s.assets[k]; if (!a || (!a.broken && a.hp >= 40)) continue;
+      const [rx, ry] = P(gx, gy, z), txt = a.broken ? `🔧 ${g.assetName(k)} RUSAK! ${fmtMoney(g.repairCost(k))}` : `⚠️ ${g.assetName(k)} aus ${Math.round(a.hp)}%`;
+      I.tag(ctx, rx, ry, txt, t, a.broken ? '#e5484d' : '#e0a100'); ctx.font = font(800, 11); const w = ctx.measureText(txt).width + 20; this.hits.push({ type: 'room', kind: 'maint', x0: rx - w / 2, x1: rx + w / 2, y0: ry - 16, y1: ry + 20, pri: 8 });
+    }
     tagFor('coffee', 2.0, 0.6, 108); tagFor('snack', 0.65, 1.95, 104); tagFor('hall', 24.5, 12.8, 80);
     for (const [k, gx, gy, z, kind, lbl] of [['dining', 4.6, -0.7, 70, 'diningUp', 'Perluas Ruang Makan'], ['hall', 24.5, 12.8, 80, 'hall', 'Perluas Aula']]) {
       const nx = g.nextFac(k); if (!s.fac[k] || !nx || s.level < nx.lvl) continue; const [ux, uy] = P(gx, gy, z), txt = `⬆️ ${lbl} ${fmtMoney(nx.cost)}`;

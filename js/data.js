@@ -156,6 +156,29 @@ export const FACILITIES = {
   }
 };
 
+// Template misi dinamis (harian/mingguan) — selalu diperbarui agar tak pernah habis
+export const QUEST_TPL = [
+  { key: 'tasksDone', t: n => `Selesaikan ${n} tiket`, d: 'Tugaskan tiket ke karyawan lalu klaim hasilnya.', daily: [2, 4], weekly: [8, 16], m: 1.2, x: 14 },
+  { key: 'perfect', t: n => `Raih ${n} hasil kerja sempurna`, d: 'Jaga mood & stres tim agar hasil kerja sempurna.', daily: [1, 2], weekly: [3, 6], m: 2.2, x: 22 },
+  { key: 'approved', t: n => `Putuskan ${n} permintaan di Inbox`, d: 'Setujui atau tolak permintaan karyawan & Direksi.', daily: [2, 3], weekly: [6, 10], m: 1.0, x: 12 },
+  { key: 'memos', t: n => `Tulis ${n} memo`, d: 'Memo resmi untuk Direksi atau proyek.', daily: [1, 1], weekly: [2, 4], m: 2.5, x: 24 },
+  { key: 'arcade', t: n => `Main Arcade ${n} kali`, d: 'Buka tab Arcade dan kumpulkan permata.', daily: [2, 3], weekly: [6, 10], m: 1.0, x: 10, g: 1 },
+  { key: 'gemsEarned', t: n => `Kumpulkan ${n} permata`, d: 'Dari Arcade, Go-Live, misi, dan Direksi.', daily: [3, 5], weekly: [12, 20], m: 1.5, x: 16 },
+  { key: 'speedups', t: n => `Percepat ${n} tiket dengan permata`, d: 'Gunakan ⚡ Percepat di tab Tugas.', daily: [1, 1], weekly: [3, 5], m: 1.5, x: 16 },
+  { key: 'mochi', t: n => `Elus Mochi ${n} kali`, d: 'Ketuk kucing Mochi di kantor.', daily: [3, 6], weekly: [10, 18], m: 0.6, x: 8 },
+  { key: 'lunches', t: n => `Karyawan makan siang ${n} kali`, d: 'Pilih menu makan siang tiap hari.', daily: [3, 8], weekly: [15, 40], m: 0.8, x: 10 },
+  { key: 'hired', t: n => `Rekrut ${n} karyawan baru`, d: 'Tambah tenaga lewat tab Tim.', weekly: [1, 2], m: 3, x: 30, g: 1 },
+  { key: 'projects', t: n => `Go-Live ${n} proyek`, d: 'Setujui proyek, kick-off, lalu luncurkan dengan siap!', weekly: [1, 2], m: 8, x: 70, g: 3 },
+  { key: 'cups', t: n => `Seruput ${n} cangkir kopi`, d: 'Tim ngopi di pantry.', daily: [3, 6], weekly: [12, 24], m: 0.7, x: 8, need: 'coffee' },
+  { key: 'snacks', t: n => `Karyawan ngemil ${n} kali`, d: 'Isi tenaga dengan kulkas & snack.', daily: [2, 5], weekly: [10, 20], m: 0.7, x: 8, need: 'snack' },
+  { key: 'psPlays', t: n => `Main PS ${n} sesi`, d: 'Stres turun, mood naik.', daily: [2, 4], weekly: [8, 14], m: 0.8, x: 10, need: 'ps' },
+  { key: 'playPlays', t: n => `Bermain di taman ${n} sesi`, d: 'Taman bermain bikin tim ceria.', daily: [2, 4], weekly: [8, 14], m: 0.8, x: 10, need: 'play' },
+  { key: 'poolSwims', t: n => `Berenang ${n} sesi`, d: 'Kolam renang untuk lepas penat.', daily: [2, 4], weekly: [8, 14], m: 0.9, x: 10, need: 'pool' },
+  { key: 'mood', abs: true, t: n => `Jaga mood tim ≥ ${n}`, d: 'Rata-rata mood seluruh karyawan.', weekly: [70, 85], m: 4, x: 40, g: 1, step: 5 },
+  { key: 'security', abs: true, t: n => `Naikkan keamanan ke ${n}`, d: 'Pasang sistem keamanan & kerjakan tiket kontrol.', weekly: [65, 85], m: 4, x: 40, g: 1, step: 5 },
+  { key: 'service', abs: true, t: n => `Jaga layanan ≥ ${n}`, d: 'Hindari tiket telat agar nasabah puas.', weekly: [70, 90], m: 4, x: 40, g: 1, step: 5 },
+  { key: 'riskLow', abs: true, t: n => `Tekan risiko ≤ ${100 - n}`, d: 'Risiko rendah = bank aman.', weekly: [55, 75], m: 4, x: 40, g: 1, step: 5 }
+];
 // Upgrade sistem & keamanan (mahal, dipasang bertahap oleh staf lewat tiket; butuh uji & aktivasi yang benar)
 export const SYSTEMS = {
   waf:    { name: 'WAF (Web Application Firewall)', emoji: '🧱', cost: 90, lvl: 5, upkeep: 1.2, steps: [['ops', 'Instalasi appliance WAF', 110], ['sec', 'Penyusunan aturan & hardening', 90]], sec: 0.8, risk: 0.5, shield: { ddos: 0.45, phishing: 0.2, bugprod: 0.2 }, desc: 'Menyaring serangan aplikasi web (SQLi, XSS, bot). Serangan DDoS & eksploitasi berkurang.' },

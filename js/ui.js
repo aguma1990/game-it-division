@@ -1,12 +1,12 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.2.2';
-import { portrait, drawMochi } from './chibi.js?v=4.2.2';
-import { sfx, setSound, isSound } from './audio.js?v=4.2.2';
-import { playPatchRush } from './minigame.js?v=4.2.2';
-import { playFlappy, playRace, playCar } from './arcade.js?v=4.2.2';
-import { hasSave, clearSave } from './store.js?v=4.2.2';
-import { genLook, makeEmployee } from './game.js?v=4.2.2';
-import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.2.2';
+import { QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.0';
+import { portrait, drawMochi } from './chibi.js?v=4.3.0';
+import { sfx, setSound, isSound } from './audio.js?v=4.3.0';
+import { playPatchRush } from './minigame.js?v=4.3.0';
+import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.0';
+import { hasSave, clearSave } from './store.js?v=4.3.0';
+import { genLook, makeEmployee } from './game.js?v=4.3.0';
+import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.0';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);
@@ -45,6 +45,7 @@ export class UI {
     g.on('levelup', d => this.enqueue(() => this.showLevelUp(d)));
     g.on('event', ev => this.enqueue(() => this.showEvent(ev)));
     g.on('covid', d => this.enqueue(() => this.showCovid(d)));
+    g.on('quarter', d => { if (d.phase !== 'done') this.enqueue(() => this.showQuarter()); });
     g.on('lunchmenu', () => this.enqueue(() => this.showLunchDialog()));
     g.on('gameover', d => { clearSave(); this.mq = []; this.showGameOver(d); });
     g.on('report', r => this.enqueue(() => this.showReport(r)));
@@ -302,7 +303,7 @@ export class UI {
   shopView() {
     const g = this.g, s = g.s;
     const tot = g.totalDesks(), nxD = tot < 27 ? { cost: DESK_COSTS[tot], lvl: DESK_LEVELS[tot] } : null;
-    const sig = 'S' + this.focus + s.level + (s.gems || 0) + '|' + JSON.stringify(s.sys) + Math.floor(s.money / 5) + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
+    const sig = 'S' + this.focus + s.level + (s.gems || 0) + '|' + JSON.stringify(s.assets) + Math.floor(s.money / 5) + JSON.stringify(s.sys) + Math.floor(s.money / 5) + '|' + Object.entries(s.fac).map(([k, v]) => { const n = g.nextFac(k); return k + v + (n && s.money >= n.cost ? 1 : 0); }).join(',') + '|' + JSON.stringify(s.deskCount) + (nxD && s.money >= nxD.cost ? 'y' : 'n') + '|' + Object.entries(DECOR).map(([k, d]) => k + (s.decor[k] ? 1 : 0) + (s.money >= d.cost ? 1 : 0)).join(',');
     let html = `<div class="sec-title"><span>Fasilitas</span></div>`;
     for (const [k, F] of Object.entries(FACILITIES)) {
       const lv = s.fac[k], cur = lv ? F.levels[lv - 1] : null, nx = g.nextFac(k);
@@ -313,6 +314,13 @@ export class UI {
         ${nx ? `<div class="t-sub" style="color:var(--pink2);font-weight:800;margin-top:3px">${lv ? '⬆️ ' : '✨ '}${nx.name}</div><div class="t-sub">${nx.desc}</div>` : `<div class="t-sub" style="color:var(--mint2);font-weight:800">Level maksimal! ✨</div>`}
         <div class="lvl-dots">${F.levels.map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></div>
         ${nx && !nx.viaSys ? `<button class="btn ${locked ? 'ghost' : ''} sm" data-act="buyfac" data-k="${k}" ${locked || poor ? 'disabled' : ''}>${locked ? '🔒 Lv.' + nx.lvl : (lv ? 'Upgrade' : 'Beli')}<br><small>${fmtMoney(nx.cost)}</small></button>` : ''}</div></div>`;
+    }
+    html += `<div class="sec-title"><span>🔧 Perawatan & Perbaikan</span></div><div class="t-sub" style="margin:0 4px 6px;font-weight:700">Server dan perangkat aus tiap hari. Servis berkala lebih murah; kalau rusak, perbaikannya mahal & operasional terganggu.</div>`;
+    for (const k of g.assetKeys()) {
+      const a = g.asset(k), hp = Math.round(a.hp), col = a.broken ? '#e5484d' : hp < 45 ? '#e0a100' : '#2fae6a';
+      html += `<div class="card ${this.focus === 'maint' ? 'focus' : ''}" style="border-left:7px solid ${col}"><div class="row"><div class="shop-ico">${{ server: '🖥️', coffee: '☕', snack: '🧊', ps: '🎮', play: '🛝', pool: '🏊' }[k]}</div><div class="grow"><div class="t-title">${g.assetName(k)} ${a.broken ? '<span class="chip late">🔧 RUSAK</span>' : hp < 45 ? '<span class="chip warn">⚠️ aus</span>' : ''}</div>
+        <div class="bar" style="height:9px;background:#e1eee6"><i style="width:${hp}%;background:${col}"></i></div><div class="t-sub">Kondisi ${hp}%</div></div>
+        ${a.broken ? `<button class="btn sm" data-act="maint" data-k="${k}" data-h="fix" ${s.money < g.repairCost(k) ? 'disabled' : ''}>Perbaiki<br><small>${fmtMoney(g.repairCost(k))}</small></button><button class="btn gold sm" data-act="maint" data-k="${k}" data-h="new" ${s.money < g.repairCost(k, 'new') ? 'disabled' : ''}>Ganti baru<br><small>${fmtMoney(g.repairCost(k, 'new'))}</small></button>` : `<button class="btn mint sm" data-act="maint" data-k="${k}" data-h="service" ${hp >= 98 || s.money < g.repairCost(k, 'service') ? 'disabled' : ''}>Servis<br><small>${fmtMoney(g.repairCost(k, 'service'))}</small></button>`}</div></div>`;
     }
     html += `<div class="sec-title"><span>🛡️ Upgrade Sistem & Keamanan (mahal, dipasang bertahap)</span></div><div class="t-sub" style="margin:0 4px 6px;font-weight:700">Beli → staf mengerjakan tiket pemasangan di tab Tugas → uji & aktifkan. Pemasangan asal-asalan (staf lemah, telat, tanpa uji) bisa gagal dan bikin kinerja tim turun.</div>`;
     for (const [id, S] of Object.entries(SYSTEMS)) {
@@ -342,18 +350,21 @@ export class UI {
   // ----- Tab Misi -----
   missionsView() {
     const g = this.g, s = g.s;
-    const list = MISSIONS.map(m => ({ m, ms: s.missions[m.id] || { done: false, claimed: false }, v: g.missionValue(m) }));
-    list.sort((a, b) => (b.ms.done && !b.ms.claimed) - (a.ms.done && !a.ms.claimed) || a.ms.claimed - b.ms.claimed);
-    const sig = 'Q' + list.map(x => x.m.id + (x.ms.done ? 1 : 0) + (x.ms.claimed ? 1 : 0) + Math.min(x.v, x.m.need)).join(',') + s.log.length + (s.log[0] || '');
-    let html = `<div class="sec-title"><span>Misi</span></div>`;
-    for (const { m, ms, v } of list) {
-      const pct = clamp(v / m.need * 100);
-      html += `<div class="card ${ms.done && !ms.claimed ? 'done' : ''}" style="${ms.claimed ? 'opacity:.55' : ''}"><div class="row"><div class="ico" style="background:${ms.claimed ? '#b8e6cc' : ms.done ? '#ffc23d' : '#c9b4ff'}">${ms.claimed ? '✅' : ms.done ? '🎁' : '🎯'}</div>
-        <div class="grow"><div class="t-title">${m.title}</div><div class="t-sub">${m.desc}</div>
-        <div class="prog-line"><div class="bar pr"><i style="width:${pct.toFixed(0)}%"></i></div>${Math.min(v, m.need)}/${m.need}</div>
-        <div class="chips"><span class="chip money">💰 ${fmtMoney(m.money)}</span>${m.gems ? `<span class="chip" style="color:#7a4fd0;font-weight:900">💎 ${m.gems}</span>` : ''}${m.xp ? `<span class="chip xp">⭐ ${m.xp} XP</span>` : ''}</div></div>
-        ${ms.done && !ms.claimed ? `<button class="btn gold sm" data-act="claimm" data-id="${m.id}">Klaim!</button>` : ''}</div></div>`;
+    const qs = [...(s.quests || [])].map(q => ({ q, ms: s.missions[q.id] || { done: false, claimed: false }, v: g.questValue(q) }));
+    const stat = MISSIONS.map(m => ({ m, ms: s.missions[m.id] || { done: false, claimed: false }, v: g.missionValue(m) }));
+    const open = stat.filter(x => !x.ms.claimed).sort((a, b) => (b.ms.done && !b.ms.claimed) - (a.ms.done && !a.ms.claimed)), doneN = stat.length - open.length;
+    const sig = 'Q' + s.day + qs.map(x => x.q.id + (x.ms.done ? 1 : 0) + Math.min(x.v, x.q.need)).join(',') + open.map(x => x.m.id + (x.ms.done ? 1 : 0) + Math.min(x.v, x.m.need)).join(',') + s.log.length + (s.log[0] || '');
+    const card = (m, ms, v, extra) => { const pct = clamp(v / m.need * 100); return `<div class="card ${ms.done && !ms.claimed ? 'done' : ''}"><div class="row"><div class="ico" style="background:${ms.done ? '#ffc23d' : '#c9b4ff'}">${ms.done ? '🎁' : '🎯'}</div>
+        <div class="grow"><div class="t-title">${esc(m.title)}</div><div class="t-sub">${esc(m.desc)}</div>
+        <div class="prog-line"><div class="bar pr"><i style="width:${pct.toFixed(0)}%"></i></div>${Math.min(Math.round(v), m.need)}/${m.need}</div>
+        <div class="chips"><span class="chip money">💰 ${fmtMoney(m.money)}</span>${m.gems ? `<span class="chip" style="color:#7a4fd0;font-weight:900">💎 ${m.gems}</span>` : ''}${m.xp ? `<span class="chip xp">⭐ ${m.xp} XP</span>` : ''}${extra || ''}</div></div>
+        ${ms.done && !ms.claimed ? `<button class="btn gold sm" data-act="claimm" data-id="${m.id}">Klaim!</button>` : ''}</div></div>`; };
+    let html = '';
+    for (const [type, label] of [['daily', '📅 Misi Harian (diganti tiap hari)'], ['weekly', '🗓️ Misi Mingguan (diganti tiap 7 hari)']]) {
+      const list = qs.filter(x => x.q.type === type); html += `<div class="sec-title"><span>${label}</span></div>`;
+      html += list.map(({ q, ms, v }) => card(q, ms, v, `<span class="chip ${q.expire - s.day <= 1 && !ms.done ? 'late' : ''}">⏳ ${ms.done ? 'selesai' : Math.max(0, q.expire - s.day) + ' hari lagi'}</span>`)).join('') || '<div class="empty">Misi baru muncul besok.</div>';
     }
+    html += `<div class="sec-title"><span>🏅 Pencapaian${doneN ? ` (${doneN} sudah diklaim)` : ''}</span></div>` + (open.map(({ m, ms, v }) => card(m, ms, v)).join('') || '<div class="empty">Semua pencapaian sudah diklaim! Misi harian & mingguan terus diperbarui ✨</div>');
     html += `<div class="sec-title"><span>📖 Jurnal kantor</span></div><div class="log">${s.log.slice(0, 14).map(l => `<div>${esc(l)}</div>`).join('') || '<div>Belum ada cerita.</div>'}</div>`;
     return { html, sig };
   }
@@ -387,6 +398,7 @@ export class UI {
       case 'reroll': g.rerollCandidates(); break;
       case 'buyfac': g.buyFacility(k); break;
       case 'buysys': g.buySystem(k); break;
+      case 'maint': g.fixAsset(k, b.dataset.h || 'service'); break;
       case 'buydesk': g.buyDesk(k); break;
       case 'buydecor': g.buyDecor(k); break;
       case 'claimm': g.claimMission(id); break;
@@ -405,7 +417,7 @@ export class UI {
     if (h.type === 'desk') { sfx('tap'); this.openTab('shop', 'desk:' + h.dept); return; }
     if (h.type === 'room') {
       sfx('tap');
-      if (h.kind === 'diningUp') { this.openTab('shop', 'fac:dining'); return; } if (h.kind === 'dining') { this.showLunchDialog(); return; } if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
+      if (h.kind === 'maint') { this.openTab('shop', 'maint'); return; } if (h.kind === 'diningUp') { this.openTab('shop', 'fac:dining'); return; } if (h.kind === 'dining') { this.showLunchDialog(); return; } if (h.kind === 'inbox' || h.kind === 'meet') this.openTab('inbox'); else if (['ctrl', 'dev', 'ops'].includes(h.kind)) this.openTab('tasks'); else if (h.kind === 'boss') this.showSettings(); else if (h.kind !== 'garden') this.openTab('shop', 'fac:' + h.kind);
     }
   }
 
@@ -550,6 +562,29 @@ export class UI {
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
   }
 
+  // Evaluasi kuartal: wajib PHK ≥1 karyawan, lalu rekrut pengganti (modal tak bisa ditutup)
+  showQuarter() {
+    const g = this.g, s = g.s, q = s.quarter; if (!q) return;
+    if (q.state === 'fire') {
+      const pool = g.quarterPool(), sel = new Set(), worst = pool[0];
+      const root = this.openModal(`<div style="font-size:46px;text-align:center">📋</div><h2>Evaluasi Kuartal</h2>
+        <p>Setiap 3 "bulan" (30 hari), kantor pusat mewajibkan evaluasi: <b>PHK minimal 1 karyawan</b> (maks. 2) lalu rekrut pengganti. Pilih berdasarkan skor kinerja (terendah di atas).</p>
+        <div class="sel-list" style="max-height:42dvh;overflow:auto">${pool.map((e, i) => { const D = DEPTS[deptOfSpec(e.spec)]; return `<button class="sel-item" data-id="${e.id}"><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'stress', 40)}" alt=""></div>
+          <div class="grow" style="text-align:left"><div class="t-title">${esc(e.name)} ${i === 0 ? '<span class="chip late">🔻 skor terendah</span>' : ''}</div><div class="t-sub"><span class="chip" style="background:${D.color}55;color:#1f3a2e;font-weight:900">${D.emoji} ${D.name}</span> ${SPECS[e.spec].name} · 💪${e.skill} · Lv.${e.lvl}</div>
+          <div class="t-sub">Skor ${Math.round(g.perfScore(e))}${e.sp ? ` · SP${e.sp}` : ''}${e.quirk ? ' · ' + QUIRKS[e.quirk].emoji + QUIRKS[e.quirk].name : ''}${e.fails >= 1 ? ' · sering telat/bug' : ''} · pesangon ${fmtMoney(e.salary * 2)}</div></div><span class="chip" data-mark>＋</span></button>`; }).join('')}</div>
+        <button class="btn block" id="qGo" style="margin-top:10px;background:linear-gradient(#ff8a8a,#e5484d);box-shadow:0 3px 0 #a82a2e" disabled>🚪 PHK terpilih (0)</button>`);
+      const upd = () => { const b = root.querySelector('#qGo'); b.disabled = sel.size < 1; b.textContent = `🚪 PHK terpilih (${sel.size})`; root.querySelectorAll('.sel-item').forEach(x => { const on = sel.has(x.dataset.id); x.style.borderColor = on ? '#e5484d' : ''; x.querySelector('[data-mark]').textContent = on ? '✔' : '＋'; }); };
+      root.querySelectorAll('.sel-item').forEach(b => b.addEventListener('click', () => { sfx('tap'); const id = b.dataset.id; if (sel.has(id)) sel.delete(id); else if (sel.size < 2) sel.add(id); upd(); }));
+      root.querySelector('#qGo').addEventListener('click', () => { if (g.quarterFire([...sel])) { sfx('oops'); this.closeModal(); this.render(true); this.hud(true); this.showQuarter(); } });
+    } else if (q.state === 'hire') {
+      const root = this.openModal(`<div style="font-size:46px;text-align:center">🌱</div><h2>Rekrut Pengganti</h2>
+        <p>Rekrut <b>${q.need - q.hired} karyawan baru</b> (${q.hired}/${q.need}). Kandidat kuartal ini berkualitas lebih baik. Beri nama sesukamu!</p>
+        <div class="sel-list" style="max-height:44dvh;overflow:auto">${s.candidates.map(c => { const R = RARITY[c.rarity], D = DEPTS[deptOfSpec(c.spec)], full = g.freeDesk(c.spec) < 0; return `<button class="sel-item" data-id="${c.id}" ${full ? 'disabled' : ''}><div class="av sm" style="--rc:${R.color}"><img src="${portrait(c.look, c.spec, 'happy', 40)}" alt=""></div>
+          <div class="grow" style="text-align:left"><div class="t-title">${esc(c.name)} <span class="chip" style="background:${R.color}33;color:${R.color}">${R.label}</span></div><div class="t-sub"><span class="chip" style="background:${D.color}55;color:#1f3a2e;font-weight:900">${D.emoji} ${D.name}</span> ${SPECS[c.spec].name} · 💪${c.skill}${c.quirk ? ' · ' + QUIRKS[c.quirk].emoji + QUIRKS[c.quirk].name : ''}</div></div><span class="chip money">${full ? 'meja penuh' : s.money >= c.cost ? fmtMoney(c.cost) : 'gratis*'}</span></button>`; }).join('')}</div>
+        <p style="font-size:11px;margin-top:6px">*Jika dana kurang, kantor pusat membantu rekrutmen.</p>`);
+      root.addEventListener('click', ev => { const b = ev.target.closest('.sel-item'); if (!b || b.disabled) return; const c = s.candidates.find(x => x.id === b.dataset.id); if (!c) return; if (g.quarterHire(c.id, c.name)) { sfx('hire'); this.closeModal(); this.render(true); this.hud(true); if (g.s.quarter) this.showQuarter(); } });
+    }
+  }
   showCovid(d) {
     const root = this.openModal(`<div style="font-size:54px;text-align:center">😷</div><h2>Wabah COVID-19 Melanda!</h2>
       <p>Pandemi memukul perbankan. Kantor pusat memangkas anggaran dan merumahkan karyawan di semua divisi. Ini terjadi <b>sekali saja</b> untuk semua pemain.</p>

@@ -1,6 +1,6 @@
 // Arcade kantor: tiga permainan singkat dengan karakter karyawan. Hadiahnya permata 💎.
-import { drawChibi } from './chibi.js?v=4.2.2';
-import { sfx } from './audio.js?v=4.2.2';
+import { drawChibi } from './chibi.js?v=4.3.0';
+import { sfx } from './audio.js?v=4.3.0';
 
 const W = 340, H = 440;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

@@ -2,9 +2,9 @@
 import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
-  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS
-} from './data.js?v=4.2.2';
-import { EVENTS } from './events.js?v=4.2.2';
+  fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL
+} from './data.js?v=4.3.0';
+import { EVENTS } from './events.js?v=4.3.0';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
@@ -139,7 +139,7 @@ export class Game {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', covid: null, covidDay: 8, sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', covid: null, covidDay: 8, quests: [], assets: {}, quarter: null, sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: false, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false, autoV: 2, gems: 5, arcade: { day: 1, plays: 0, best: {} }, autoPaid: {}
     };
@@ -147,7 +147,7 @@ export class Game {
     for (let i = 0; i < 3; i++) this.spawnTask(['dev', 'ops', 'ctrl'][i], 'mid');
     this.genCandidates();
     this.addLog('Selamat datang di ' + this.s.bank + '! ✨');
-    this.checkMissions(true);
+    this.refillQuests(); this.checkMissions(true);
   }
 
   load(obj) {
@@ -167,6 +167,7 @@ export class Game {
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
     if (this.s.fac.hall === undefined) this.s.fac.hall = 0; if (!this.s.fac.dining) this.s.fac.dining = 1;
     for (const [id, v] of Object.entries(this.s.sys || {})) { if (!SYSTEMS[id]) { delete this.s.sys[id]; continue; } if (!Number.isFinite(v.step)) v.step = 0; if (!Number.isFinite(v.q)) v.q = 2.5; if (!Number.isFinite(v.eff)) v.eff = 1; }
+    if (!this.s.quests) this.s.quests = []; if (!this.s.assets) this.s.assets = {}; if (this.s.quarter === undefined) this.s.quarter = null;
     if (!DIFFS[this.s.diff]) this.s.diff = 'normal'; if (this.s.debt === undefined) this.s.debt = 0; if (!this.s.sys) this.s.sys = {}; if (this.s.debuff === undefined) this.s.debuff = null; if (this.s.econ === undefined) this.s.econ = null; if (this.s.surcharge === undefined) this.s.surcharge = null;
     if (!this.s.lunch || this.s.lunch.day !== this.s.day) this.s.lunch = { day: this.s.day, state: 'none', menu: null, cost: 0 };
     else if (['asked', 'eating'].includes(this.s.lunch.state)) this.s.lunch.state = this.s.hour < 12 ? 'none' : 'done';
@@ -185,7 +186,8 @@ export class Game {
     for (const [id, v] of Object.entries(this.s.sys || {})) if (v.state === 'install' && !this.s.tasks.some(t => t.sys === id)) this.spawnSysTask(id);
     if (this.s.covid === undefined && this.s.covidDay === undefined) { this.s.covid = null; this.covidHit(); }   // save lama: wabah menghantam sekali saat dimuat   // pulihkan tiket pemasangan yang hilang
     this.s.speed = Math.min(this.s.speed, 1);
-    this.checkMissions(true);
+    this.refillQuests(); this.checkMissions(true);
+    if (this.s.quarter) this.emit('quarter', { phase: this.s.quarter.state });
   }
 
   initRuntime() {
@@ -306,7 +308,7 @@ export class Game {
     const energyF = 0.45 + 0.55 * e.energy / 100, moodF = 0.65 + 0.35 * e.mood / 100;
     const stressF = e.stress > 70 ? 1 - 0.5 * (e.stress - 70) / 30 : 1;
     return base * (e.broken ? 0.5 : 1) * (e.deviceBonus || 1) * this.matchFactor(e, t) * energyF * moodF * stressF * (e.buff > 0 ? 1.2 : 1) * (T === 'rajin' ? 1.1 : 1) * (T === 'santai' ? 0.95 : 1)
-      * (this.s.debuff && this.s.debuff.left > 0 ? this.s.debuff.mult : 1) * (e.quirk === 'lambat' ? 0.75 : 1) * (this.s.employees.some(x => x.act && x.act.kind === 'gossip' && x.act.arrived && x.act.mate === e.id) ? 0.5 : 1);
+      * (this.s.debuff && this.s.debuff.left > 0 ? this.s.debuff.mult : 1) * (t && t.onsite && this.isBroken('server') ? 0.5 : 1) * (e.quirk === 'lambat' ? 0.75 : 1) * (this.s.employees.some(x => x.act && x.act.kind === 'gossip' && x.act.arrived && x.act.mate === e.id) ? 0.5 : 1);
   }
 
   assign(taskId, empId) {
@@ -374,7 +376,7 @@ export class Game {
   goWork(e, silent) {
     const t = e.task ? this.task(e.task) : null;
     this.cancelActivity(e); this.releaseWork(e);
-    if (t && t.onsite) {
+    if (t && t.onsite && !this.isBroken('server')) {
       const i = this.slots.server.indexOf(null);
       if (i >= 0) { this.slots.server[i] = e.id; e.wslot = i; const sp = spotFor('server', i); this.setPath(e, sp.x, sp.y, 'work'); return; }
     }
@@ -402,6 +404,7 @@ export class Game {
       return true;
     }
     if (!this.s.fac[kind]) { if (forced) this.toast('Belum punya fasilitas itu — beli di Toko ya! 🛍️', 'warn'); return false; }
+    if (this.isBroken(kind)) { if (forced || Math.random() < 0.15) this.toast(`🔧 ${this.assetName(kind)} sedang rusak! Perbaiki di Inbox / Toko → Perawatan.`, 'warn'); return false; }
     if (kind === 'coffee' && this.s.coffeeStock <= 0) { if (forced || Math.random() < 0.2) this.toast('☕ Biji kopi habis! Setujui pembelian stok di Inbox.', 'warn'); this.ensureRestock(); return false; }
     if (kind === 'snack' && this.s.snackStock <= 0) { if (forced || Math.random() < 0.2) this.toast('🍪 Snack habis! Setujui pembelian stok di Inbox.', 'warn'); this.ensureRestock(); return false; }
     this.cancelActivity(e); this.releaseWork(e);
@@ -620,6 +623,83 @@ export class Game {
     else { e.x += dx / d * m; e.y += dy / d * m; if (Math.abs(dx - dy) > 0.01) e.flip = dx - dy >= 0 ? 1 : -1; }
   }
 
+  // ---------- Kerusakan & perawatan aset (server, mesin kopi, PS, ...) ----------
+  assetKeys() { return ['server', 'coffee', 'snack', 'ps', 'play', 'pool'].filter(k => this.s.fac[k] > 0); }
+  asset(k) { const a = this.s.assets; if (!a[k]) a[k] = { hp: 100, broken: false }; return a[k]; }
+  isBroken(k) { const a = this.s.assets[k]; return !!(a && a.broken); }
+  assetName(k) { return { server: 'Server', coffee: 'Mesin Kopi', snack: 'Kulkas', ps: 'Konsol PS', play: 'Taman Bermain', pool: 'Kolam Renang' }[k] || k; }
+  repairCost(k, kind) {
+    const lvl = this.s.fac[k] || 1, base = (k === 'server' ? 14 + lvl * 12 : 5 + lvl * 5.5) * this.costMul();
+    return r1(kind === 'service' ? base * 0.35 : kind === 'new' ? base * 1.8 : base);
+  }
+  breakAsset(k) {
+    const a = this.asset(k); if (a.broken) return; a.broken = true; a.hp = Math.min(a.hp, 15);
+    const name = this.assetName(k), fix = this.repairCost(k), nw = this.repairCost(k, 'new');
+    this.toast(`🔧 ${name} RUSAK! ${k === 'server' ? 'Tiket onsite melambat & keamanan turun.' : 'Tidak bisa dipakai sampai diperbaiki.'}`, 'bad'); this.emit('sfx', 'oops');
+    this.assetRequest(k);
+  }
+  assetRequest(k) {
+    if (this.s.inbox.some(r => r.type === 'asset' && r.asset === k)) return;
+    const name = this.assetName(k), fix = this.repairCost(k), nw = this.repairCost(k, 'new');
+    this.addRequest({ type: 'asset', asset: k, icon: '🔧', from: null, sender: 'Tim Infrastruktur', title: `${name} rusak!`, body: `${name} mati total karena komponen aus. Perbaiki (${fmtMoney(fix)}) atau ganti unit baru (${fmtMoney(nw)}, kondisi 100%). Selama rusak, ${k === 'server' ? 'layanan & keamanan terus turun' : 'mood tim turun tiap hari'}.`, opts: [{ k: 'fix', label: `Perbaiki ${fmtMoney(fix)}`, cost: fix }, { k: 'new', label: `Ganti baru ${fmtMoney(nw)}`, cost: nw }], ttl: 6 });
+  }
+  fixAsset(k, how) {
+    const s = this.s, a = this.asset(k), c = this.repairCost(k, how === 'new' ? 'new' : how === 'service' ? 'service' : 'fix');
+    if (how === 'service' && a.broken) return false;
+    if (how === 'service' && a.hp >= 98) { this.toast('Kondisinya masih prima 👍', 'info'); return false; }
+    if (s.money < c) { this.toast(`Dana kurang (${fmtMoney(c)}) 🥲`, 'warn'); return false; }
+    this.addMoney(-c); a.broken = false; a.hp = how === 'fix' ? 85 : 100;
+    s.inbox = s.inbox.filter(r => !(r.type === 'asset' && r.asset === k)); s.stat.repairs = (s.stat.repairs || 0) + 1;
+    this.emit('sfx', 'buy'); this.toast(`✅ ${this.assetName(k)} ${how === 'service' ? 'diservis' : how === 'new' ? 'diganti baru' : 'diperbaiki'} (−${fmtMoney(c)})`, 'good'); this.emit('change'); return true;
+  }
+  maintDaily() {
+    const s = this.s;
+    for (const k of this.assetKeys()) {
+      const a = this.asset(k);
+      if (a.broken) {
+        if (s.day % 3 === 0) this.assetRequest(k);
+        if (k === 'server') { this.addStat('service', -2.5); this.addStat('risk', 1.5); this.addStat('security', -1.5); } else s.employees.forEach(e => { e.mood = clamp(e.mood - 0.8); });
+        continue;
+      }
+      a.hp = Math.max(0, a.hp - rnd(1.6, 3.3) * (k === 'server' ? 1.2 : 1) * (1 + 0.03 * (s.level - 1)));
+      if (a.hp < 45 && Math.random() < (45 - a.hp) / 85) this.breakAsset(k);
+      else if (a.hp < 40 && !s.inbox.some(r => r.type === 'maintwarn' && r.asset === k) && Math.random() < 0.4) this.toast(`⚠️ ${this.assetName(k)} mulai aus (${Math.round(a.hp)}%). Servis di Toko → Perawatan agar tak rusak!`, 'warn');
+    }
+  }
+  // ---------- Evaluasi kuartalan (tiap 30 hari = 3 "bulan" game): wajib PHK + rekrut baru ----------
+  perfScore(e) { return e.skill * 0.5 + e.lvl * 3 + (e.tasksDone || 0) * 0.6 - (e.fails || 0) * 8 - (e.sp || 0) * 10 - (e.quirk ? 6 : 0) + e.mood * 0.1; }
+  quarterPool() {
+    const s = this.s, cnt = {}; s.employees.filter(e => !e.leaving).forEach(e => { const d = deptOfSpec(e.spec); cnt[d] = (cnt[d] || 0) + 1; });
+    return s.employees.filter(e => !e.leaving && cnt[deptOfSpec(e.spec)] > 1).sort((a, b) => this.perfScore(a) - this.perfScore(b));
+  }
+  quarterStart() {
+    const s = this.s, pool = this.quarterPool();
+    if (s.employees.length < 4 || !pool.length) { this.toast('📋 Evaluasi kuartal: tim terlalu kecil untuk PHK, dilewati.', 'info'); return; }
+    s.quarter = { day: s.day, state: 'fire', released: [], need: 1 };
+    this.emit('sfx', 'alert'); this.emit('banner', { text: '📋 EVALUASI KUARTAL', sub: 'Wajib PHK minimal 1 karyawan & rekrut pengganti' });
+    this.addLog(`Evaluasi kuartal hari ke-${s.day}.`); this.emit('quarter', { phase: 'fire' }); this.emit('change');
+  }
+  quarterFire(ids) {
+    const s = this.s, q = s.quarter; if (!q || q.state !== 'fire') return false;
+    const list = ids.map(id => this.emp(id)).filter(e => e && !e.leaving && this.quarterPool().includes(e)).slice(0, 2);
+    if (!list.length) { this.toast('Pilih minimal 1 karyawan untuk di-PHK.', 'warn'); return false; }
+    const depts = [];
+    for (const e of list) { const d = deptOfSpec(e.spec); if (!this.quarterPool().includes(e)) continue; this.fire(e.id, { force: true }); q.released.push(e.name); depts.push(d); }
+    q.state = 'hire'; q.need = Math.max(1, q.released.length); q.hired = 0;
+    const used = s.employees.map(e => e.name), boost = Math.min(10, s.level) + 2, cand = [];
+    const dl = depts.length ? depts : DEPT_KEYS;
+    for (let i = 0; i < 4; i++) { const dk = dl[i % dl.length], specs = DEPTS[dk].specs, c = makeEmployee(specs[i % 2], rollRarity(boost), used, Math.random() < 0.4); c.cost = r1(c.salary * 6); used.push(c.name); cand.push(c); }
+    s.candidates = cand; this.emit('quarter', { phase: 'hire' }); this.emit('change'); return true;
+  }
+  quarterHire(id, name) {
+    const s = this.s, q = s.quarter; if (!q || q.state !== 'hire') return false;
+    const c = s.candidates.find(x => x.id === id); if (!c) return false;
+    if (this.freeDesk(c.spec) < 0) { this.toast(`Meja ${DEPTS[deptOfSpec(c.spec)].name} penuh — pilih kandidat bidang lain.`, 'warn'); return false; }
+    const free = s.money < c.cost; if (free) this.toast('🤝 Dana kurang — rekrutmen dibantu kantor pusat (gratis).', 'info');
+    if (!this.hire(id, name, false, free)) return false;
+    q.hired++; if (q.hired >= q.need) { s.quarter = null; this.toast('✅ Evaluasi kuartal selesai: tim diperbarui!', 'good'); this.emit('quarter', { phase: 'done' }); }
+    return true;
+  }
   // ---------- Wabah COVID: terjadi SEKALI untuk semua pemain ----------
   layoff(e) {
     const s = this.s; this.cancelActivity(e); this.releaseWork(e);
@@ -839,7 +919,9 @@ export class Game {
     for (const r of [...s.inbox]) if (s.day >= r.deadline) this.expireRequest(r);
     // hari baru
     if (this.visit) this.releaseGreeters(); if (this.party) for (const e of s.employees) if (e.act && e.act.kind === 'party') e.act.t = e.act.dur;
-    s.day++; s.hour = 8; this.chargeAutos(); if (!s.covid && s.covidDay && s.day >= s.covidDay) this.covidHit(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
+    this.maintDaily();
+    s.day++; s.hour = 8; this.chargeAutos(); if (!s.covid && s.covidDay && s.day >= s.covidDay) this.covidHit();
+    this.expireQuests(); this.refillQuests(); if (s.day % 30 === 0 && s.day >= 30) this.quarterStart(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
     if (this.stars() >= 5) { s.starDays++; } else s.starDays = 0;
     // tiket baru
     const n = 1 + Math.floor(s.employees.length * 0.6) + (Math.random() < 0.4 ? 1 : 0);
@@ -911,6 +993,7 @@ export class Game {
 
   // ---------- Rekrut ----------
   genCandidates() {
+    if (this.s.quarter && this.s.quarter.state === 'hire') return;   // jangan ganti daftar kandidat saat evaluasi kuartal berlangsung
     const s = this.s, used = s.employees.map(e => e.name), list = [];
     const boost = Math.min(10, s.level);
     const needD = this.loadAdvice().map(x => x.dept);
@@ -1108,11 +1191,11 @@ export class Game {
     const d = deskPos(m.desk); this.setPath(e, d.x + 0.8, d.y + 0.1, 'act'); this.say(e, 'Eh eh, sini deh… 🤫', 2.5); return true;
   }
   fireCost(e) { return r1(e.salary * 3); }
-  fire(id) {
+  fire(id, opt) {
     const s = this.s, e = this.emp(id); if (!e || e.leaving) return false;
     if (s.employees.filter(x => !x.leaving).length <= 1) { this.toast('Minimal harus ada 1 karyawan di divisi 🥺', 'warn'); return false; }
     if (s.employees.filter(x => !x.leaving && deptOfSpec(x.spec) === deptOfSpec(e.spec)).length <= 1) { this.toast(`Bidang ${DEPTS[deptOfSpec(e.spec)].name} harus punya minimal 1 karyawan. Rekrut pengganti dulu 🥺`, 'warn'); return false; }
-    const c = this.fireCost(e); if (s.money < c) { this.toast(`Dana pesangon kurang (${fmtMoney(c)}) 🥲`, 'warn'); return false; }
+    const c = opt && opt.force ? r1(e.salary * 2) : this.fireCost(e); if (!(opt && opt.force) && s.money < c) { this.toast(`Dana pesangon kurang (${fmtMoney(c)}) 🥲`, 'warn'); return false; }
     this.addMoney(-c);
     const meetProj = e.act && e.act.kind === 'meeting' ? e.act.proj : null;
     this.cancelActivity(e); this.releaseWork(e); if (meetProj) this.meetingDone(meetProj);
@@ -1127,14 +1210,14 @@ export class Game {
     this.toast(`🚪 ${e.name} meninggalkan kantor. Meja ${DEPTS[deptOfSpec(e.spec)].name} kosong.`, 'info'); this.emit('sfx', 'oops'); this.emit('change'); return true;
   }
   removeEmp(e) { if (this.scold && this.scold.id === e.id) this.scold = null; const s = this.s; this.cancelActivity(e); this.releaseWork(e); s.employees = s.employees.filter(x => x !== e); this.emit('change'); }
-  hire(id, name, autoDesk) {
+  hire(id, name, autoDesk, free) {
     const s = this.s, c = s.candidates.find(x => x.id === id); if (!c) return false;
     let di = this.freeDesk(c.spec);
     if (di < 0 && autoDesk) { const d = deptOfSpec(c.spec), dc = DESK_COSTS[this.totalDesks()] || 0; if (s.deskCount[d] < DESK_MAX && s.money >= dc + c.cost && this.buyDesk(d)) di = this.freeDesk(c.spec); }
     if (di < 0) { this.toast(`Meja ${DEPTS[deptOfSpec(c.spec)].name} penuh! Beli meja baru, atau pecat karyawan yang ada.`, 'warn'); return false; }
-    if (s.money < c.cost) { this.toast('Dana tidak cukup untuk merekrut 🥲', 'warn'); return false; }
+    if (!free && s.money < c.cost) { this.toast('Dana tidak cukup untuk merekrut 🥲', 'warn'); return false; }
     const e = JSON.parse(JSON.stringify(c)); delete e.cost; e.desk = di; e.name = this.cleanName(name, c.name);
-    this.addMoney(-c.cost); s.candidates = s.candidates.filter(x => x.id !== id);
+    this.addMoney(-(free ? 0 : c.cost)); s.candidates = s.candidates.filter(x => x.id !== id);
     s.employees.push(e); this.initEmpRuntime(e); e.x = ENTRY.x; e.y = ENTRY.y; e.cool = 10;
     this.goWork(e); this.emit('dir', { pose: 'wave', text: `Selamat bergabung, ${e.name.split(' ')[0]}! 🌿`, face: 'happy', dur: 2.6 }); this.say(e, 'Salam kenal! 🌿', 4); this.face(e, 'happy', 4);
     s.stat.hired++; this.addLog(`${e.name} bergabung!`);
@@ -1165,7 +1248,7 @@ export class Game {
     if (nx.viaSys) { this.toast('Upgrade server ini lewat menu Upgrade Sistem 🖥️', 'info'); return false; }
     if (s.level < nx.lvl) { this.toast(`Butuh level ${nx.lvl} dulu 🔒`, 'warn'); return false; }
     if (s.money < nx.cost) { this.toast('Dana belum cukup 🥲', 'warn'); return false; }
-    this.addMoney(-nx.cost); s.fac[k]++; this.resizeSlots(); this.emit('dir', { pose: 'cheer', text: `${nx.name} terpasang! ✨`, face: 'happy', dur: 2.2 });
+    this.addMoney(-nx.cost); s.fac[k]++; if (s.assets[k]) { s.assets[k].hp = 100; s.assets[k].broken = false; } this.resizeSlots(); this.emit('dir', { pose: 'cheer', text: `${nx.name} terpasang! ✨`, face: 'happy', dur: 2.2 });
     this.addLog(`Beli ${nx.name}!`); this.emit('sfx', 'buy'); this.toast(`✨ ${nx.name} terpasang!`, 'good');
     this.emit('fx', { kind: 'confetti', buy: k }); this.checkMissions(); this.emit('change');
     return true;
@@ -1273,6 +1356,7 @@ export class Game {
       case 'projuat': this.projUatDecision(r, opt.k, extra); break;
       case 'golive': this.projGoLive(r, opt.k); break;
       case 'sysgo': this.systemActivate(r.sys, opt.k); break;
+      case 'asset': { const a = this.asset(r.asset); a.broken = false; a.hp = opt.k === 'new' ? 100 : 85; s.stat.repairs = (s.stat.repairs || 0) + 1; this.toast(`✅ ${this.assetName(r.asset)} ${opt.k === 'new' ? 'diganti baru' : 'diperbaiki'}.`, 'good'); break; }
       case 'project': this.addProject(r.project); this.addXp(40); this.toast(`📁 Proyek ${r.project} disetujui! Adakan rapat kick-off di Ruang Meeting (tab Inbox).`, 'good'); break;
     }
     this.emit('sfx', 'hire'); this.addLog(`Disetujui: ${r.title}`); this.checkMissions(); this.emit('change'); return true;
@@ -1443,9 +1527,34 @@ export class Game {
       case 'facCoffee': return s.fac.coffee; case 'facSnack': return s.fac.snack; case 'facPs': return s.fac.ps; case 'facPlay': return s.fac.play;
       case 'approved': return st.approved; case 'memos': return st.memos;
       case 'facPool': return s.fac.pool || 0; case 'scolds': return st.scolds || 0; case 'projects': return st.projects || 0;
+      case 'snacks': return st.snacks || 0; case 'poolSwims': return st.poolSwims || 0; case 'playPlays': return st.playPlays || 0; case 'lunches': return st.lunches || 0;
+      case 'arcade': return st.arcade || 0; case 'gemsEarned': return st.gems || 0; case 'speedups': return st.speedups || 0;
+      case 'mood': return Math.round(this.avgMood()); case 'security': return Math.round(s.security); case 'service': return Math.round(s.service); case 'riskLow': return Math.round(100 - s.risk); case 'money': return s.money;
       case 'level': return s.level; case 'team': return s.employees.length; case 'stars': return this.stars(); case 'day': return s.day;
     }
     return 0;
+  }
+  // Misi dinamis: harian & mingguan selalu terisi ulang
+  questValue(q) { return q.abs ? this.missionValue(q) : this.missionValue(q) - (q.base || 0); }
+  genQuest(type) {
+    const s = this.s, active = new Set(s.quests.filter(q => q.type === type).map(q => q.key));
+    const pool = QUEST_TPL.filter(t => t[type] && !active.has(t.key) && (!t.need || s.fac[t.need] > 0) && (t.key !== 'hired' || s.employees.length < 26));
+    if (!pool.length) return null;
+    const t = pool[Math.floor(Math.random() * pool.length)], r = t[type], lv = s.level, sc = 1 + 0.12 * (lv - 1) * (type === 'weekly' ? 1.4 : 1);
+    let need;
+    if (t.abs) { const cur = this.missionValue(t); need = Math.min(r[1], Math.max(r[0], Math.ceil((cur + 8) / (t.step || 5)) * (t.step || 5))); if (t.key === 'riskLow') need = Math.max(r[0], Math.min(r[1], need)); }
+    else { const f = Math.min(1.8, 1 + (s.employees.length - 3) * 0.06); need = Math.max(r[0], Math.round((r[0] + Math.random() * (r[1] - r[0])) * (t.key === 'lunches' || t.key === 'cups' || t.key === 'snacks' ? f : 1))); }
+    const mult = type === 'weekly' ? 3.2 : 1, size = t.abs ? 1 : Math.max(1, need / r[0]);
+    const q = { id: 'q' + nid('').slice(0, 6) + Math.floor(Math.random() * 99), type, key: t.key, abs: !!t.abs, base: t.abs ? 0 : this.missionValue(t), need, title: t.t(need), desc: t.d, money: r1(t.m * (t.abs ? 1 : size) * mult * sc), xp: Math.round(t.x * (t.abs ? 1 : Math.sqrt(size)) * mult * (1 + 0.05 * (lv - 1))), gems: (t.g || (type === 'weekly' && Math.random() < 0.7 ? 1 : 0)) + (type === 'weekly' ? 1 : 0), expire: s.day + (type === 'weekly' ? 7 : 1), day: s.day };
+    s.quests.push(q); s.missions[q.id] = { done: false, claimed: false }; return q;
+  }
+  refillQuests() {
+    const s = this.s;
+    for (const [type, n] of [['daily', 3], ['weekly', 3]]) { let guard = 0; while (s.quests.filter(q => q.type === type).length < n && guard++ < 8) if (!this.genQuest(type)) break; }
+  }
+  expireQuests() {
+    const s = this.s;
+    s.quests = s.quests.filter(q => { const ms = s.missions[q.id]; if (ms && ms.done) return true; if (s.day >= q.expire) { delete s.missions[q.id]; return false; } return true; });
   }
   checkMissions(silent) {
     const s = this.s;
@@ -1453,12 +1562,18 @@ export class Game {
       const ms = s.missions[m.id] || (s.missions[m.id] = { done: false, claimed: false });
       if (!ms.done && this.missionValue(m) >= m.need) { ms.done = true; if (!silent) { this.toast(`🎯 Misi selesai: ${m.title}`, 'good'); this.emit('sfx', 'mission'); this.emit('change'); } }
     }
+    for (const q of s.quests || []) {
+      const ms = s.missions[q.id] || (s.missions[q.id] = { done: false, claimed: false });
+      if (!ms.done && this.questValue(q) >= q.need) { ms.done = true; if (!silent) { this.toast(`🎯 Misi ${q.type === 'daily' ? 'harian' : 'mingguan'} selesai: ${q.title}`, 'good'); this.emit('sfx', 'mission'); this.emit('change'); } }
+    }
   }
   claimMission(id) {
-    const m = MISSIONS.find(x => x.id === id), ms = this.s.missions[id];
+    const q = (this.s.quests || []).find(x => x.id === id), m = q || MISSIONS.find(x => x.id === id), ms = this.s.missions[id];
     if (!m || !ms || !ms.done || ms.claimed) return;
     ms.claimed = true; this.addMoney(m.money); if (m.xp) this.addXp(m.xp); if (m.gems) this.addGems(m.gems);
-    this.emit('sfx', 'coin'); this.toast(`Hadiah misi: +${fmtMoney(m.money)}${m.xp ? ` · +${m.xp} XP` : ''}`, 'good'); this.emit('change');
+    this.emit('sfx', 'coin'); this.toast(`Hadiah misi: +${fmtMoney(m.money)}${m.xp ? ` · +${m.xp} XP` : ''}${m.gems ? ` · +${m.gems} 💎` : ''}`, 'good');
+    if (q) { this.s.quests = this.s.quests.filter(x => x.id !== id); delete this.s.missions[id]; this.genQuest(q.type); }
+    this.emit('change');
   }
 
   save() { this.emit('save', this.serialize()); }

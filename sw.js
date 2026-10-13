@@ -1,5 +1,5 @@
 // Service worker: cache semua aset supaya game bisa dimainkan offline.
-const VERSION = 'neko-bank-it-v4.2.2';
+const VERSION = 'neko-bank-it-v4.3.0';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/main.js', './js/game.js', './js/data.js', './js/events.js', './js/chibi.js', './js/iso.js', './js/scene.js',
