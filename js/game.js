@@ -139,7 +139,7 @@ export class Game {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', covid: null, covidDay: 8, sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: false, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false, autoV: 2, gems: 5, arcade: { day: 1, plays: 0, best: {} }, autoPaid: {}
     };
@@ -182,7 +182,8 @@ export class Game {
     this.s.tasks.forEach(t => { if (t.state === 'doing' && !this.emp(t.emp)) { t.state = 'new'; t.emp = null; } });
     this.s.employees.forEach(e => { if (e.task) { const t = this.task(e.task); if (!t || t.state !== 'doing') e.task = null; } });
     this.s.employees.forEach(e => { Object.assign(e, deskPos(e.desk)); this.goWork(e, true); });
-    for (const [id, v] of Object.entries(this.s.sys || {})) if (v.state === 'install' && !this.s.tasks.some(t => t.sys === id)) this.spawnSysTask(id);   // pulihkan tiket pemasangan yang hilang
+    for (const [id, v] of Object.entries(this.s.sys || {})) if (v.state === 'install' && !this.s.tasks.some(t => t.sys === id)) this.spawnSysTask(id);
+    if (this.s.covid === undefined && this.s.covidDay === undefined) { this.s.covid = null; this.covidHit(); }   // save lama: wabah menghantam sekali saat dimuat   // pulihkan tiket pemasangan yang hilang
     this.s.speed = Math.min(this.s.speed, 1);
     this.checkMissions(true);
   }
@@ -619,6 +620,30 @@ export class Game {
     else { e.x += dx / d * m; e.y += dy / d * m; if (Math.abs(dx - dy) > 0.01) e.flip = dx - dy >= 0 ? 1 : -1; }
   }
 
+  // ---------- Wabah COVID: terjadi SEKALI untuk semua pemain ----------
+  layoff(e) {
+    const s = this.s; this.cancelActivity(e); this.releaseWork(e);
+    const t = e.task && this.task(e.task); if (t) { t.state = 'new'; t.emp = null; t.progress = Math.max(0, t.progress * 0.5); }
+    e.task = null; e.claimBubble = null; e.leaving = true; e.desk = -1;
+    for (const tk of s.tasks) if (tk.state === 'done' && tk.doneBy === e.id) tk.doneBy = null;
+    s.inbox = s.inbox.filter(r => r.from !== e.id);
+    this.say(e, 'Maaf, kantor harus merumahkan kami… 😷', 5); this.face(e, 'sleep', 8); this.setPath(e, ENTRY.x, ENTRY.y, 'leave');
+  }
+  covidHit() {
+    const s = this.s; if (s.covid) return;
+    const before = s.money; if (s.money > 0) s.money = r1(s.money * 0.2);
+    const gone = [];
+    for (const dk of DEPT_KEYS) {
+      const crew = s.employees.filter(e => !e.leaving && deptOfSpec(e.spec) === dk).sort((a, b) => (b.skill + b.lvl * 3) - (a.skill + a.lvl * 3));
+      crew.slice(2).forEach(e => { gone.push(e.name); this.layoff(e); });
+    }
+    s.employees.forEach(e => { if (!e.leaving) { e.mood = clamp(e.mood - 15); e.stress = clamp(e.stress + 10); } });
+    this.addStat('service', -6); this.addStat('risk', 5);
+    s.covid = { day: s.day, before, after: s.money, gone };
+    this.addLog(`Wabah COVID: kas jadi ${fmtMoney(s.money)}, ${gone.length} karyawan dirumahkan.`);
+    this.emit('sfx', 'oops'); this.emit('banner', { text: '😷 WABAH COVID-19', sub: 'Kas tinggal 20% & tiap bidang hanya 2 karyawan' });
+    this.emit('covid', s.covid); this.emit('change');
+  }
   // ---------- Permata 💎, otomatisasi berbayar & arcade ----------
   addGems(n, why) { this.s.gems = Math.max(0, (this.s.gems || 0) + n); if (n > 0) { this.s.stat.gems = (this.s.stat.gems || 0) + n; if (why) this.toast(`💎 +${n} permata${why ? ' · ' + why : ''}`, 'good'); } this.emit('change'); }
   speedCost(t) { return Math.max(1, Math.ceil(Math.max(0, t.work - t.progress) / 40)); }
@@ -814,7 +839,7 @@ export class Game {
     for (const r of [...s.inbox]) if (s.day >= r.deadline) this.expireRequest(r);
     // hari baru
     if (this.visit) this.releaseGreeters(); if (this.party) for (const e of s.employees) if (e.act && e.act.kind === 'party') e.act.t = e.act.dur;
-    s.day++; s.hour = 8; this.chargeAutos(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
+    s.day++; s.hour = 8; this.chargeAutos(); if (!s.covid && s.covidDay && s.day >= s.covidDay) this.covidHit(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
     if (this.stars() >= 5) { s.starDays++; } else s.starDays = 0;
     // tiket baru
     const n = 1 + Math.floor(s.employees.length * 0.6) + (Math.random() < 0.4 ? 1 : 0);

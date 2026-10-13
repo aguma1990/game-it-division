@@ -44,6 +44,7 @@ export class UI {
     g.on('change', () => { this.render(true); this.hud(true); });
     g.on('levelup', d => this.enqueue(() => this.showLevelUp(d)));
     g.on('event', ev => this.enqueue(() => this.showEvent(ev)));
+    g.on('covid', d => this.enqueue(() => this.showCovid(d)));
     g.on('lunchmenu', () => this.enqueue(() => this.showLunchDialog()));
     g.on('gameover', d => { clearSave(); this.mq = []; this.showGameOver(d); });
     g.on('report', r => this.enqueue(() => this.showReport(r)));
@@ -549,6 +550,15 @@ export class UI {
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) { sfx('tap'); this.closeModal(); } });
   }
 
+  showCovid(d) {
+    const root = this.openModal(`<div style="font-size:54px;text-align:center">😷</div><h2>Wabah COVID-19 Melanda!</h2>
+      <p>Pandemi memukul perbankan. Kantor pusat memangkas anggaran dan merumahkan karyawan di semua divisi. Ini terjadi <b>sekali saja</b> untuk semua pemain.</p>
+      <div class="kv"><span>💰 Kas sebelumnya</span><b>${fmtMoney(d.before)}</b><span>📉 Kas sekarang (20%)</span><b class="r">${fmtMoney(d.after)}</b><span>👥 Dirumahkan</span><b class="r">${d.gone.length} karyawan</b><span>🏢 Sisa per bidang</span><b>maks. 2 orang</b></div>
+      ${d.gone.length ? `<p style="margin:8px 0;font-size:12px">Dirumahkan: ${d.gone.map(esc).join(', ')}.</p>` : ''}
+      <p style="margin:6px 0 10px">💡 Mood tim turun, layanan melemah, risiko naik. Rekrut kembali pelan-pelan, jaga kas, dan manfaatkan permata & Arcade!</p>
+      <button class="btn block" id="covidOk">💪 Bertahan!</button>`);
+    root.querySelector('#covidOk').addEventListener('click', () => { sfx('tap'); this.closeModal(); this.render(true); this.hud(true); });
+  }
   showGameOver(d) {
     const root = this.openModal(`<div style="font-size:54px;text-align:center">💸</div><h2>${esc(d.bank || 'Bank')} BANGKRUT!</h2>
       <p>${esc(d.why)}.<br>Kantor pusat menutup divisi TI-mu.</p>
