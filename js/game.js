@@ -3,8 +3,8 @@ import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
   fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL, BANKRUPT_LIMIT
-} from './data.js?v=4.3.4';
-import { EVENTS } from './events.js?v=4.3.4';
+} from './data.js?v=4.3.5';
+import { EVENTS } from './events.js?v=4.3.5';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
