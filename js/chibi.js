@@ -1,7 +1,7 @@
 // Gambar karakter chibi ala anime Jepang (prosedural, Canvas 2D).
 // Koordinat lokal: (0,0) = telapak kaki, karakter menghadap ke depan, tinggi ±68.
 
-import { SPECS } from './data.js?v=4.3.0';
+import { SPECS } from './data.js?v=4.3.1';
 
 const TAU = Math.PI * 2;
 const INK = '#4a3350';
