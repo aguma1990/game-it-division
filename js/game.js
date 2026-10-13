@@ -3,8 +3,8 @@ import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
   fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL
-} from './data.js?v=4.3.1';
-import { EVENTS } from './events.js?v=4.3.1';
+} from './data.js?v=4.3.2';
+import { EVENTS } from './events.js?v=4.3.2';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
@@ -135,11 +135,11 @@ export class Game {
   emit(ev, p) { (this.l[ev] || []).forEach(fn => fn(p)); }
 
   // ---------- Sesi ----------
-  newGame({ name, bank, dirLook, diff }) {
+  newGame({ name, bank, dirLook, diff, noCovid }) {
     this.s = {
       v: 1, name: name || 'Direktur', bank: bank || 'Bank Sakura Nusantara', dirLook: dirLook || { hair: '#4a3f66', style: 'bob', bangs: 2, eye: '#5a7bff', skin: '#ffe3d0', skirt: true, acc: 'none' }, day: 1, hour: 8, speed: 1,
       money: 45, level: 1, xp: 0, security: 66, service: 76, risk: 22,
-      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', covid: null, covidDay: 8, quests: [], assets: {}, quarter: null, sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
+      deskCount: { ctrl: 1, dev: 1, ops: 1 }, deskV: 3, starterDone: false, projects: [], diff: DIFFS[diff] ? diff : 'normal', covid: null, covidDay: noCovid ? null : 8, quests: [], assets: {}, quarter: null, sys: {}, debuff: null, debt: 0, econ: null, surcharge: null, lunch: { day: 1, state: 'none', menu: null, cost: 0 }, fac: { dining: 1, hall: 0, coffee: 0, snack: 0, ps: 0, play: 0, pool: 0, server: 1 }, decor: {}, employees: [], tasks: [], candidates: [],
       missions: {}, stat: { assigned: 0, tasksDone: 0, cups: 0, psPlays: 0, playPlays: 0, hired: 0, mochi: 0, perfect: 0, mgWins: 0, events: 0, praise: 0, bestStreak: 0, approved: 0, rejected: 0, memos: 0 },
       week: { income: 0, expense: 0, tasks: 0 }, inbox: [], memos: [], coffeeStock: 30, snackStock: 24, firstReq: false, auto: false, autoBreak: false, sound: true, log: [], eventCool: 3, starDays: 0, bailouts: 0, ended: false, autoV: 2, gems: 5, arcade: { day: 1, plays: 0, best: {} }, autoPaid: {}
     };
@@ -865,7 +865,7 @@ export class Game {
   dailyCost() { return r1(this.salaryTotal() + this.overhead() + this.debtPay()); }
   runway() { const c = this.dailyCost(); return c > 0 ? Math.max(0, Math.floor(this.s.money / c)) : 99; }
   bankrupt(why) {
-    const s = this.s; if (s.ended) return; s.ended = true;
+    const s = this.s; if (s.ended) return; s.ended = true; s.speed = 0; this.blocking = true;
     this.emit('sfx', 'lose'); this.addLog('BANGKRUT: ' + why);
     this.emit('gameover', { day: s.day, level: s.level, projects: s.stat.projects || 0, tasks: s.stat.tasksDone || 0, staff: s.employees.length, why, bank: s.bank });
   }
