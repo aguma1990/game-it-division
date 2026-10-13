@@ -394,8 +394,8 @@ export class Game {
       return true;
     }
     if (!this.s.fac[kind]) { if (forced) this.toast('Belum punya fasilitas itu — beli di Toko ya! 🛍️', 'warn'); return false; }
-    if (kind === 'coffee' && this.s.coffeeStock <= 0) { if (forced || Math.random() < 0.2) this.toast('☕ Biji kopi habis! Setujui pembelian stok di Inbox.', 'warn'); return false; }
-    if (kind === 'snack' && this.s.snackStock <= 0) { if (forced || Math.random() < 0.2) this.toast('🍪 Snack habis! Setujui pembelian stok di Inbox.', 'warn'); return false; }
+    if (kind === 'coffee' && this.s.coffeeStock <= 0) { if (forced || Math.random() < 0.2) this.toast('☕ Biji kopi habis! Setujui pembelian stok di Inbox.', 'warn'); this.ensureRestock(); return false; }
+    if (kind === 'snack' && this.s.snackStock <= 0) { if (forced || Math.random() < 0.2) this.toast('🍪 Snack habis! Setujui pembelian stok di Inbox.', 'warn'); this.ensureRestock(); return false; }
     this.cancelActivity(e); this.releaseWork(e);
     const n = this.capacity(kind), idx = this.slots[kind].indexOf(null);
     if (idx >= 0) {
@@ -983,8 +983,16 @@ export class Game {
       if (G.every(gu => !gu.path.length)) this.visit = null;
     }
   }
+  // Pastikan permintaan isi ulang stok selalu muncul di Inbox (sekali per hari) saat stok menipis
+  ensureRestock() {
+    const s = this.s; s.restockDay = s.restockDay || {};
+    for (const [k, fac, stock] of [['coffee', 'coffee', s.coffeeStock], ['snack', 'snack', s.snackStock]]) {
+      if (s.fac[fac] && stock <= (k === 'snack' ? 4 : 5) && s.restockDay[k] !== s.day && !s.inbox.some(r => r.type === k) && s.employees.length) { s.restockDay[k] = s.day; this.genRequest(k); }
+    }
+  }
   tickDaily(dt) {
     const s = this.s, L = s.lunch;
+    this._rsT = (this._rsT || 0) + dt; if (this._rsT > 3) { this._rsT = 0; this.ensureRestock(); }
     if (L.day !== s.day) { s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 }; return; }
     if (this.party && !s.employees.some(e => e.act && e.act.kind === 'party')) this.party = null;
     if (this.visit) this.tickVisit(dt);
