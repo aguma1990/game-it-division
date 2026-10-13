@@ -12,6 +12,7 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 export const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
+const AUTO_BREAK_COST = 20;     // Rp jt per hari
 
 // ----- Tata letak isometrik (satuan petak) -----
 // Baris belakang: Pantry & Lounge. Baris 1: ruang Pengendalian (kiri) & Pengembangan (kanan).
@@ -639,15 +640,15 @@ export class Game {
     if (s[k]) { s[k] = false; this.toast(k === 'auto' ? '🤖 Auto-tugas dimatikan.' : '☕ Auto-istirahat dimatikan.', 'info'); this.emit('change'); return; }
     if (s.autoPaid[k] !== s.day) {
       if (k === 'auto') { if ((s.gems || 0) < 3) { this.toast('Auto-tugas butuh 3 💎 per hari. Main Arcade untuk dapat permata!', 'warn'); return; } s.gems -= 3; }
-      else { if (s.money < 50) { this.toast('Auto-istirahat butuh Rp 50 jt per hari. Kas belum cukup 🥲', 'warn'); return; } this.addMoney(-50); }
+      else { if (s.money < AUTO_BREAK_COST) { this.toast(`Auto-istirahat butuh Rp ${AUTO_BREAK_COST} jt per hari. Kas belum cukup 🥲`, 'warn'); return; } this.addMoney(-AUTO_BREAK_COST); }
       s.autoPaid[k] = s.day;
     }
-    s[k] = true; this.emit('sfx', 'buy'); this.toast(k === 'auto' ? '🤖 Auto-tugas aktif (3 💎/hari).' : '☕ Auto-istirahat aktif (Rp 50 jt/hari).', 'good'); this.emit('change');
+    s[k] = true; this.emit('sfx', 'buy'); this.toast(k === 'auto' ? '🤖 Auto-tugas aktif (3 💎/hari).' : `☕ Auto-istirahat aktif (Rp ${AUTO_BREAK_COST} jt/hari).`, 'good'); this.emit('change');
   }
   chargeAutos() {
     const s = this.s; s.autoPaid = s.autoPaid || {};
     if (s.auto) { if ((s.gems || 0) >= 3) { s.gems -= 3; s.autoPaid.auto = s.day; } else { s.auto = false; this.toast('🤖 Permata habis — Auto-tugas dimatikan. Main Arcade untuk dapat permata!', 'warn'); } }
-    if (s.autoBreak) { if (s.money >= 50) { this.addMoney(-50); s.autoPaid.autoBreak = s.day; this.addLog('Auto-istirahat −Rp 50 jt.'); } else { s.autoBreak = false; this.toast('☕ Kas kurang — Auto-istirahat dimatikan.', 'warn'); } }
+    if (s.autoBreak) { if (s.money >= AUTO_BREAK_COST) { this.addMoney(-AUTO_BREAK_COST); s.autoPaid.autoBreak = s.day; this.addLog(`Auto-istirahat −Rp ${AUTO_BREAK_COST} jt.`); } else { s.autoBreak = false; this.toast('☕ Kas kurang — Auto-istirahat dimatikan.', 'warn'); } }
   }
   arcadeLeft() { const a = this.s.arcade; return a.day === this.s.day ? Math.max(0, 5 - a.plays) : 5; }
   arcadeCan(empId) {
