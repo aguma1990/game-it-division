@@ -38,8 +38,12 @@ function begin(opts) {
 // Performa: resolusi kanvas menyesuaikan otomatis bila perangkat lambat; saat jeda/dialog digambar setengah frame
 let last = performance.now(), ema = 16, nFrames = 0, skip = false;
 function loop(now) {
+  requestAnimationFrame(loop);   // jadwalkan dulu agar game tak membeku walau ada error sesaat
+  try { frameBody(now); } catch (err) { console.error(err); }
+}
+function frameBody(now) {
   const idle = game.blocking || (game.s && game.s.speed === 0);
-  if (idle) { skip = !skip; if (skip) { requestAnimationFrame(loop); return; } }
+  if (idle) { skip = !skip; if (skip) return; }
   const raw = now - last;
   if (!idle && raw < 200) {
     ema = ema * 0.94 + raw * 0.06;
@@ -52,7 +56,6 @@ function loop(now) {
   const dt = Math.min(0.1, raw / 1000); last = now;
   game.update(dt); scene.frame(dt); scene.draw(); ui.tick(dt);
   if (dirty && now - lastSave > 6000) hooks.save();
-  requestAnimationFrame(loop);
 }
 
 window.addEventListener('resize', () => { if (game.s) ui.layout(); });

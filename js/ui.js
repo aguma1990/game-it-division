@@ -229,7 +229,7 @@ export class UI {
         <span class="chip ${left <= 1 ? 'late' : ''}">⏳ ${left <= 0 ? 'Hari ini' : left + ' hari'}</span></div>
         <div class="t-sub" style="margin-top:6px;font-weight:600;line-height:1.45">${esc(r.body)}</div>
         <div class="chips">${r.memo ? '<span class="chip warn">✍️ butuh memo</span>' : ''}${r.type === 'repair' ? '<span class="chip late">produktivitas −50% selama rusak</span>' : ''}</div>
-        <div class="acts" style="margin-top:8px">${btns}${r.proj ? '' : `<button class="btn ghost sm" data-act="reject" data-id="${r.id}">❌ Tolak</button>`}</div></div>`;
+        <div class="acts" style="margin-top:8px">${btns}${r.proj || r.type === 'sysgo' ? '' : `<button class="btn ghost sm" data-act="reject" data-id="${r.id}">❌ Tolak</button>`}</div></div>`;
     }
     const projs = s.projects || [];
     if (projs.length) html += `<div class="sec-title"><span>📁 Proyek</span></div>`;

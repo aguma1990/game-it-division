@@ -165,6 +165,7 @@ export class Game {
     this.s.deskV = 3; if (!this.s.projects) this.s.projects = []; this.s.projects.forEach(p => { if (p.state === 'meeting') p.state = 'plan'; });
     if (this.s.fac.pool === undefined) this.s.fac.pool = 0;
     if (this.s.fac.hall === undefined) this.s.fac.hall = 0; if (!this.s.fac.dining) this.s.fac.dining = 1;
+    for (const [id, v] of Object.entries(this.s.sys || {})) { if (!SYSTEMS[id]) { delete this.s.sys[id]; continue; } if (!Number.isFinite(v.step)) v.step = 0; if (!Number.isFinite(v.q)) v.q = 2.5; if (!Number.isFinite(v.eff)) v.eff = 1; }
     if (!DIFFS[this.s.diff]) this.s.diff = 'normal'; if (this.s.debt === undefined) this.s.debt = 0; if (!this.s.sys) this.s.sys = {}; if (this.s.debuff === undefined) this.s.debuff = null; if (this.s.econ === undefined) this.s.econ = null; if (this.s.surcharge === undefined) this.s.surcharge = null;
     if (!this.s.lunch || this.s.lunch.day !== this.s.day) this.s.lunch = { day: this.s.day, state: 'none', menu: null, cost: 0 };
     else if (['asked', 'eating'].includes(this.s.lunch.state)) this.s.lunch.state = this.s.hour < 12 ? 'none' : 'done';
@@ -180,6 +181,7 @@ export class Game {
     this.s.tasks.forEach(t => { if (t.state === 'doing' && !this.emp(t.emp)) { t.state = 'new'; t.emp = null; } });
     this.s.employees.forEach(e => { if (e.task) { const t = this.task(e.task); if (!t || t.state !== 'doing') e.task = null; } });
     this.s.employees.forEach(e => { Object.assign(e, deskPos(e.desk)); this.goWork(e, true); });
+    for (const [id, v] of Object.entries(this.s.sys || {})) if (v.state === 'install' && !this.s.tasks.some(t => t.sys === id)) this.spawnSysTask(id);   // pulihkan tiket pemasangan yang hilang
     this.s.speed = Math.min(this.s.speed, 1);
     this.checkMissions(true);
   }
@@ -195,8 +197,9 @@ export class Game {
     Object.assign(e, { st: 'idle', ...deskPos(e.desk), path: [], step: null, goal: null, act: null, cool: rnd(4, 14), buff: 0, face: null, faceT: 0, say: null, sayT: 0, wslot: -1, flip: 1, hidden: false, onLeave: false, sickT: 0, claimBubble: null });
   }
   serialize() {
-    const clean = JSON.parse(JSON.stringify(this.s, (k, v) => (['path', 'step', 'act', 'say', 'claimBubble', 'st', 'x', 'y', 'goal', 'hidden', 'onLeave'].includes(k) ? undefined : k === 'employees' ? v.filter(e => !e.leaving) : v)));
-    return JSON.stringify(clean);
+    // kunci runtime hanya dibuang dari objek karyawan (jangan dari objek lain, mis. kemajuan pemasangan sistem)
+    const RT = ['path', 'step', 'act', 'say', 'claimBubble', 'st', 'x', 'y', 'goal', 'hidden', 'onLeave', 'task_'];
+    return JSON.stringify(this.s, (k, v) => (k === 'employees' && Array.isArray(v) ? v.filter(e => !e.leaving).map(e => { const o = { ...e }; RT.forEach(x => delete o[x]); return o; }) : v));
   }
 
   resizeSlots() {
@@ -364,11 +367,11 @@ export class Game {
   setPath(e, x, y, goal) {
     e.step = null; e.path = route(e.x, e.y, x, y); e.goal = goal; e.st = 'walk';
   }
-  goDeskPos(e) { return deskPos(e.desk); }
+  goDeskPos(e) { return e.desk >= 0 && e.desk < 27 ? deskPos(e.desk) : { x: ENTRY.x, y: ENTRY.y }; }
   atPos(e, d) { return Math.hypot(e.x - d.x, e.y - d.y) < 0.08 && !e.step; }
   goWork(e, silent) {
     const t = e.task ? this.task(e.task) : null;
-    this.releaseWork(e);
+    this.cancelActivity(e); this.releaseWork(e);
     if (t && t.onsite) {
       const i = this.slots.server.indexOf(null);
       if (i >= 0) { this.slots.server[i] = e.id; e.wslot = i; const sp = spotFor('server', i); this.setPath(e, sp.x, sp.y, 'work'); return; }
@@ -546,6 +549,7 @@ export class Game {
   }
 
   burnout(e) {
+    if (e.leaving) return;
     this.cancelActivity(e); this.releaseWork(e);
     const t = e.task ? this.task(e.task) : null;
     if (t) { t.state = 'new'; t.emp = null; e.task = null; }
@@ -808,6 +812,7 @@ export class Game {
     // permintaan yang tak diputuskan sampai tenggat
     for (const r of [...s.inbox]) if (s.day >= r.deadline) this.expireRequest(r);
     // hari baru
+    if (this.visit) this.releaseGreeters(); if (this.party) for (const e of s.employees) if (e.act && e.act.kind === 'party') e.act.t = e.act.dur;
     s.day++; s.hour = 8; this.chargeAutos(); if (s.arcade) { s.arcade.day = s.day; s.arcade.plays = 0; } this.visit = null; this.party = null; s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 };
     if (this.stars() >= 5) { s.starDays++; } else s.starDays = 0;
     // tiket baru
@@ -1039,12 +1044,22 @@ export class Game {
       if (s.fac[fac] && stock <= (k === 'snack' ? 4 : 5) && s.restockDay[k] !== s.day && !s.inbox.some(r => r.type === k) && s.employees.length) { s.restockDay[k] = s.day; this.genRequest(k); }
     }
   }
+  // Pembersih: lepaskan slot fasilitas yang menunjuk karyawan yang sudah tidak ada / tidak lagi beraktivitas di sana
+  janitor() {
+    for (const k of ['coffee', 'snack', 'ps', 'play', 'pool', 'meeting']) {
+      const a = this.slots[k]; if (!a) continue;
+      a.forEach((id, i) => { if (!id) return; const e = this.emp(id); if (!e || e.leaving || !e.act || e.act.kind !== k) a[i] = null; });
+    }
+    for (const k of Object.keys(this.queue)) this.queue[k] = this.queue[k].filter(id => { const e = this.emp(id); return e && !e.leaving; });
+    const sv = this.slots.server; sv.forEach((id, i) => { if (id) { const e = this.emp(id); if (!e || e.wslot !== i) sv[i] = null; } });
+  }
   tickDaily(dt) {
     const s = this.s, L = s.lunch;
+    this._jT = (this._jT || 0) + dt; if (this._jT > 2) { this._jT = 0; this.janitor(); }
     this._rsT = (this._rsT || 0) + dt; if (this._rsT > 3) { this._rsT = 0; this.ensureRestock(); }
     if (L.day !== s.day) { s.lunch = { day: s.day, state: 'none', menu: null, cost: 0 }; return; }
     if (this.party && !s.employees.some(e => e.act && e.act.kind === 'party')) this.party = null;
-    if (this.visit) this.tickVisit(dt);
+    if (this.visit) this.tickVisit(dt); else if (s.employees.some(e => e.act && e.act.kind === 'greet')) this.releaseGreeters();
     // menu makan siang: tanya pemain pukul 10:30
     if (s.hour >= 10.5 && L.state === 'none' && s.employees.length) { L.state = 'asked'; this.emit('lunchmenu', {}); }
     if (s.hour >= 12 && L.state === 'asked') { L.state = 'done'; this.toast('🥪 Menu makan siang belum dipilih — karyawan bawa bekal sendiri.', 'warn'); }
@@ -1196,6 +1211,11 @@ export class Game {
   resolveRequest(id, action, optKey, memo, extra) {
     const s = this.s, r = s.inbox.find(x => x.id === id); if (!r) return false;
     const e = r.from ? this.emp(r.from) : null;
+    if (action === 'reject' && (r.proj || r.type === 'sysgo')) {   // keputusan proyek/sistem tak boleh menggantung: tolak = pilihan paling aman
+      const k = r.type === 'golive' ? 'delay' : r.type === 'sysgo' ? 'uat' : null, o = k && r.opts.find(x => x.k === k);
+      if (o && o.cost <= s.money) return this.resolveRequest(id, 'approve', k);
+      return this.expireRequest(r);
+    }
     if (action === 'reject') {
       s.inbox = s.inbox.filter(x => x.id !== id); s.stat.rejected++;
       if (r.type === 'leave' && e) { e.mood = clamp(e.mood - 8); this.say(e, 'Yah… oke deh 🥲', 3); }
