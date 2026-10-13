@@ -120,47 +120,67 @@ export function playRace(host, { emp, rivals }) {
   });
 }
 
-// ===== 3) Panjat Pinang =====
-export function playPole(host, { emp, cheerers }) {
+// ===== 3) Balap Mobil (geser kiri-kanan, hindari lalu lintas) =====
+export function playCar(host, { emp }) {
   return new Promise(resolve => {
-    const { cv, ctx, scoreEl } = frame(host, '🎋 Panjat Pinang', 'Ketuk cepat agar jagoanmu memanjat! Batang licin bikin merosot — apalagi di bagian berminyak. Raih hadiah di puncak!');
-    const BASE = 372, TOPY = 78, SPAN = BASE - TOPY, POLE = 170, LIMIT = 22;
-    const greasy = [[26, 38], [58, 70], [84, 94]];
-    const power = clamp(0.88 + 0.28 * (emp.energy / 100), 0.85, 1.15) * (emp.trait === 'rajin' ? 1.06 : 1);
-    let h = 0, t = 0, left = LIMIT, started = false, over = false, tapT = 0, sweat = [], won = false, count = 0;
-    const tap = () => { if (over) return; if (!started) return; h = clamp(h + 1.75 * power, 0, 100); tapT = 0.18; };
-    const onKey = e => { if (e.code === 'Space') { e.preventDefault(); tap(); } };
-    cv.addEventListener('pointerdown', e => { e.preventDefault(); tap(); }); window.addEventListener('keydown', onKey);
-    const end = () => { if (over) return; over = true; won = h >= 99.9; sfx(h >= 50 ? 'win' : 'lose'); const gems = won ? (left > 6 ? 6 : 5) : h >= 75 ? 3 : h >= 50 ? 2 : h >= 25 ? 1 : 0; setTimeout(() => { stop(); window.removeEventListener('keydown', onKey); resolve({ score: Math.round(h), gems, label: won ? 'sampai puncak!' : `memanjat ${Math.round(h)}%` }); }, 1200); };
+    const { cv, ctx, scoreEl } = frame(host, '🏎️ Balap Mobil', 'Geser jari / mouse ke kiri-kanan (atau tombol ← →) untuk menghindari mobil & kerucut. Bertahan 45 detik! Punya 2 nyawa ❤️.');
+    const ROAD_L = 50, ROAD_R = 290, LANES = 4, LW = (ROAD_R - ROAD_L) / LANES, CW = 30, CH = 52, CY = 360, DUR = 45;
+    const laneX = i => ROAD_L + LW * (i + 0.5);
+    let x = laneX(1.5), target = x, t = 0, started = false, over = false, hearts = 2, inv = 0, scroll = 0, spawn = 0.8, cars = [], trees = [], dist = 0, left = 0, right = 0, shake = 0, count = 0, finished = false;
+    for (let i = 0; i < 6; i++) trees.push({ x: Math.random() < 0.5 ? 14 + Math.random() * 26 : 300 + Math.random() * 28, y: i * 80, s: 0.8 + Math.random() * 0.5 });
+    const rect = r => cv.getBoundingClientRect();
+    const move = e => { const b = rect(); target = clamp((e.clientX - b.left) / b.width * W, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2); };
+    cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture?.(e.pointerId); move(e); });
+    cv.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') move(e); });
+    const kd = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') { left = 1; e.preventDefault(); } if (e.code === 'ArrowRight' || e.code === 'KeyD') { right = 1; e.preventDefault(); } };
+    const ku = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') left = 0; if (e.code === 'ArrowRight' || e.code === 'KeyD') right = 0; };
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    const finish = () => { if (over) return; over = true; finished = t >= DUR; sfx(finished || t > 16 ? 'win' : 'lose'); const gems = clamp(Math.floor(t / 8), 0, 5) + (finished ? 1 : 0); const m = Math.round(dist / 10); setTimeout(() => { stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); resolve({ score: m, gems, label: finished ? `finis ${m} m tanpa kalah!` : `melaju ${m} m` }); }, 1200); };
+    const carColors = ['#e5484d', '#5ab8f5', '#ffd84d', '#8f8cf2', '#ff9f43', '#3fbf7f'];
+    const speedNow = () => 190 + Math.min(1, t / DUR) * 150;          // sedang: 190 → 340 px/dtk
+    const spawnRow = () => {
+      const cnt = t < 14 ? 1 : t < 28 ? (Math.random() < 0.45 ? 2 : 1) : (Math.random() < 0.5 ? 2 : Math.random() < 0.25 ? 3 : 1);
+      const lanes = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, Math.min(cnt, 3));
+      for (const l of lanes) cars.push({ x: laneX(l) + (Math.random() - 0.5) * 8, y: -70, kind: Math.random() < 0.28 ? 'cone' : 'car', c: carColors[Math.floor(Math.random() * carColors.length)], sp: Math.random() * 40 - 10 });
+    };
+    const drawCar = (x, y, color, me) => {
+      ctx.save(); ctx.translate(x, y); ctx.fillStyle = 'rgba(0,0,0,0.22)'; rr(ctx, -CW / 2 + 3, -CH / 2 + 5, CW, CH, 8); ctx.fill();
+      ctx.fillStyle = color; rr(ctx, -CW / 2, -CH / 2, CW, CH, 8); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = 'rgba(190,235,255,0.9)'; rr(ctx, -CW / 2 + 4, -CH / 2 + 11, CW - 8, 12, 4); ctx.fill(); rr(ctx, -CW / 2 + 5, CH / 2 - 17, CW - 10, 8, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(-CW / 2 + 3, -CH / 2 + 2, 6, 4); ctx.fillRect(CW / 2 - 9, -CH / 2 + 2, 6, 4);
+      ctx.fillStyle = '#ff5a5a'; ctx.fillRect(-CW / 2 + 3, CH / 2 - 5, 6, 3); ctx.fillRect(CW / 2 - 9, CH / 2 - 5, 6, 3); ctx.restore();
+    };
     const stop = loop(dt => {
-      t += dt; tapT = Math.max(0, tapT - dt);
-      if (!started) { count += dt; if (count >= 2.2) { started = true; sfx('pop'); } }
+      t += dt; shake = Math.max(0, shake - dt); inv = Math.max(0, inv - dt);
+      if (!started) { count += dt; if (count >= 2) { started = true; sfx('pop'); } t = 0; }
       else if (!over) {
-        left -= dt; const g = greasy.some(([a, b]) => h >= a && h <= b), slip = (3.6 + h * 0.085) * (g ? 1.9 : 1); h = clamp(h - slip * dt, 0, 100);
-        scoreEl.textContent = Math.round(h) + '%'; if (tapT > 0 && Math.random() < 0.5) sweat.push({ x: POLE + 20, y: BASE - (h / 100) * SPAN - 50, vy: -30, life: 0.5 });
-        if (h >= 99.9 || left <= 0) end();
+        const sp = speedNow(); scroll = (scroll + sp * dt) % 60; dist += sp * dt; scoreEl.textContent = Math.round(dist / 10) + ' m';
+        if (left || right) target = clamp(target + (right - left) * 330 * dt, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2);
+        const dx = target - x, mv = 430 * dt; x += Math.abs(dx) <= mv ? dx : Math.sign(dx) * mv;
+        spawn -= dt; if (spawn <= 0) { spawnRow(); spawn = Math.max(0.5, 0.95 - t / DUR * 0.4) * (190 / sp) * 1.15; }
+        for (const c of cars) c.y += sp * (c.kind === 'cone' ? 1 : 0.62) * dt;   // mobil lain melaju lebih lambat dari kita, kerucut diam
+        for (const c of cars) {
+          if (inv > 0 || c.hit) continue; const hw = c.kind === 'cone' ? 8 : CW / 2 - 3, hh = c.kind === 'cone' ? 8 : CH / 2 - 4;
+          if (Math.abs(c.x - x) < hw + CW / 2 - 5 && Math.abs(c.y - CY) < hh + CH / 2 - 6) { c.hit = true; hearts--; inv = 1.6; shake = 0.3; sfx('bad'); if (hearts <= 0) { finish(); break; } }
+        }
+        cars = cars.filter(c => c.y < H + 80);
+        if (t >= DUR) finish();
       }
-      sweat.forEach(s => { s.y += s.vy * dt; s.life -= dt; }); sweat = sweat.filter(s => s.life > 0);
+      trees.forEach(tr => { tr.y += (started ? speedNow() : 120) * dt; if (tr.y > H + 40) { tr.y = -40; tr.x = Math.random() < 0.5 ? 14 + Math.random() * 26 : 300 + Math.random() * 28; } });
       // gambar
-      const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#9fdcff'); bg.addColorStop(0.7, '#e8f7ee'); bg.addColorStop(1, '#bfe6a0'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-      cloud(ctx, 60, 50, 1); cloud(ctx, 270, 90, 0.8);
-      for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#ff7a59' : '#fff'; ctx.beginPath(); ctx.moveTo(20 + i * 40, 20); ctx.lineTo(40 + i * 40, 20); ctx.lineTo(30 + i * 40, 42); ctx.closePath(); ctx.fill(); }
-      ctx.fillStyle = '#c9a36a'; ctx.fillRect(POLE - 9, TOPY, 18, SPAN + 6); ctx.fillStyle = '#a98250'; ctx.fillRect(POLE - 9, TOPY, 5, SPAN + 6);
-      for (const [a, b] of greasy) { const ya = BASE - (b / 100) * SPAN, yb = BASE - (a / 100) * SPAN; const gg = ctx.createLinearGradient(POLE - 9, 0, POLE + 9, 0); gg.addColorStop(0, '#5a3a14'); gg.addColorStop(0.5, '#a87a3a'); gg.addColorStop(1, '#5a3a14'); ctx.fillStyle = gg; ctx.fillRect(POLE - 10, ya, 20, yb - ya); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(POLE - 4, ya + 3, 3, yb - ya - 6); }
-      ctx.fillStyle = '#e5484d'; for (let k = 0; k < 6; k++) ctx.fillRect(POLE - 11, TOPY + 6 + k * 52, 22, 5);
-      ctx.fillStyle = '#7bbf6a'; ctx.fillRect(0, BASE + 4, W, H - BASE); ctx.fillStyle = '#6c4a22'; ctx.fillRect(POLE - 22, BASE + 2, 44, 12);
-      // hadiah di puncak
-      ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.fillText('🎁', POLE - 26, TOPY - 6 + Math.sin(t * 4) * 2); ctx.fillText('🚲', POLE + 4, TOPY - 6 + Math.sin(t * 4 + 1) * 2); ctx.fillText('📺', POLE + 32, TOPY - 6 + Math.sin(t * 4 + 2) * 2);
-      // penonton (karyawan lain)
-      cheerers.slice(0, 2).forEach((c, i) => drawChibi(ctx, { x: i ? 292 : 48, y: BASE + 46, s: 0.62, look: c.look, spec: c.spec, pose: 'cheer', t: t + i, face: 'happy', dir: i ? -1 : 1 }));
-      // pemain
-      const py = BASE - (h / 100) * SPAN + 4;
-      drawChibi(ctx, { x: POLE, y: py, s: 0.72, look: emp.look, spec: emp.spec, pose: over && !won ? 'stand' : won ? 'cheer' : 'walk', t: tapT > 0 ? t * 1.2 : 0, face: won ? 'happy' : h < 8 ? 'stress' : 'excited', dir: 1 });
-      ctx.font = '12px serif'; ctx.textAlign = 'center'; sweat.forEach(s => { ctx.globalAlpha = s.life * 2; ctx.fillText('💦', s.x, s.y); }); ctx.globalAlpha = 1;
-      // waktu & tinggi
-      ctx.fillStyle = 'rgba(14,50,38,0.85)'; rr(ctx, 10, 52, 70, 22, 11); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 12px ui-rounded, system-ui'; ctx.textAlign = 'center'; ctx.fillText(`⏱ ${Math.max(0, left).toFixed(1)}s`, 45, 67);
-      if (!started) banner(ctx, 'Siap memanjat!', 'Ketuk cepat & jangan berhenti');
-      if (over) banner(ctx, won ? '🏆 SAMPAI PUNCAK!' : left <= 0 ? '⏰ Waktu habis' : 'Selesai', won ? 'Hadiah diraih!' : `Tinggi ${Math.round(h)}%`);
+      ctx.save(); if (shake > 0) ctx.translate((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7);
+      ctx.fillStyle = '#7bbf6a'; ctx.fillRect(-10, -10, W + 20, H + 20); ctx.fillStyle = '#6fb25f'; for (let k = -1; k < 9; k++) ctx.fillRect(-10, k * 60 + scroll - 30, W + 20, 30);
+      ctx.fillStyle = '#4a4f5a'; ctx.fillRect(ROAD_L, -10, ROAD_R - ROAD_L, H + 20); ctx.fillStyle = '#e9e9ee'; ctx.fillRect(ROAD_L - 4, -10, 4, H + 20); ctx.fillRect(ROAD_R, -10, 4, H + 20);
+      ctx.fillStyle = '#d9d9e2'; for (let l = 1; l < LANES; l++) for (let k = -1; k < 9; k++) ctx.fillRect(ROAD_L + l * LW - 2, k * 60 + scroll - 20, 4, 28);
+      trees.forEach(tr => { ctx.font = `${26 * tr.s}px serif`; ctx.textAlign = 'center'; ctx.fillText('🌲', tr.x, tr.y); });
+      if (started && t > DUR - 6) { const fy = 30 + (t - (DUR - 6)) / 6 * 300; for (let k = 0; k < 12; k++) { ctx.fillStyle = k % 2 ? '#1f3a2e' : '#fff'; ctx.fillRect(ROAD_L + k * 20, fy, 20, 10); ctx.fillStyle = k % 2 ? '#fff' : '#1f3a2e'; ctx.fillRect(ROAD_L + k * 20, fy + 10, 20, 10); } }
+      for (const c of cars) { if (c.kind === 'cone') { ctx.fillStyle = '#ff7a29'; ctx.beginPath(); ctx.moveTo(c.x, c.y - 12); ctx.lineTo(c.x + 10, c.y + 10); ctx.lineTo(c.x - 10, c.y + 10); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 6, c.y, 12, 4); } else drawCar(c.x, c.y, c.c, false); }
+      if (inv <= 0 || Math.floor(t * 14) % 2) { drawCar(x, CY, '#2fae6a', true); drawChibi(ctx, { x, y: CY + 12, s: 0.34, look: emp.look, spec: emp.spec, pose: 'stand', t, face: hearts < 2 ? 'stress' : 'excited', dir: 1, shadow: false }); }
+      ctx.restore();
+      ctx.font = '16px serif'; ctx.textAlign = 'left'; ctx.fillText('❤️'.repeat(Math.max(0, hearts)) + '🖤'.repeat(2 - Math.max(0, hearts)), 8, 22);
+      ctx.fillStyle = 'rgba(14,50,38,0.85)'; rr(ctx, W - 92, 8, 84, 22, 11); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 12px ui-rounded, system-ui'; ctx.textAlign = 'center'; ctx.fillText(`⏱ ${Math.max(0, DUR - t).toFixed(0)}s`, W - 50, 23);
+      if (!started) banner(ctx, `Siap, ${emp.name.split(' ')[0]}?`, 'Geser kiri-kanan untuk menyetir!');
+      if (over) banner(ctx, finished ? '🏁 FINIS!' : '💥 Tabrakan!', `${Math.round(dist / 10)} m`);
     });
   });
 }

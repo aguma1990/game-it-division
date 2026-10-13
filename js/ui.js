@@ -3,7 +3,7 @@ import { SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIO
 import { portrait, drawMochi } from './chibi.js';
 import { sfx, setSound, isSound } from './audio.js';
 import { playPatchRush } from './minigame.js';
-import { playFlappy, playRace, playPole } from './arcade.js';
+import { playFlappy, playRace, playCar } from './arcade.js';
 import { hasSave, clearSave } from './store.js';
 import { genLook, makeEmployee } from './game.js';
 import { NAMES_F, NAMES_M, SURNAMES } from './data.js';
@@ -130,7 +130,7 @@ export class UI {
     const games = [
       ['flappy', '🐤', 'Terbang Menembus Firewall', 'Ketuk untuk mengepak & lewati celah firewall. Tiap 3 firewall = 1 💎 (maks 6).', best.flappy ? `Rekor: ${best.flappy} firewall` : 'Belum pernah main'],
       ['race', '🏃', 'Lomba Lari Kantor', 'Ketuk secepat mungkin! Juara 1 = 5 💎, juara 2 = 3, juara 3 = 2, juara 4 = 1.', best.race ? `Terbaik: juara ${best.race}` : 'Belum pernah main'],
-      ['pole', '🎋', 'Panjat Pinang', 'Panjat batang licin sampai puncak sebelum waktu habis. Sampai puncak = 5–6 💎.', best.pole ? `Rekor: ${best.pole}%` : 'Belum pernah main']
+      ['car', '🏎️', 'Balap Mobil', 'Geser kiri-kanan untuk menghindari mobil & kerucut. Tiap 8 detik bertahan = 1 💎, finis 45 dtk = 6 💎. Ada 2 nyawa.', best.car ? `Rekor: ${best.car} m` : 'Belum pernah main']
     ];
     const html = `<div class="card" style="text-align:center"><div class="gem-big">💎 ${s.gems || 0}</div><div class="t-sub" style="font-weight:800">Jatah main hari ini: <b>${left}/5</b> · tiap main −14 ⚡ energi & +4 💚 mood karyawan</div>
       <div class="t-sub" style="margin-top:6px">Gunakan permata untuk <b>⚡ Percepat tiket/proyek</b> (di tab Tugas), <b>🤖 Auto-tugas</b> (3 💎/hari), dan percepat uji sistem. Permata juga didapat dari Go-Live, misi, naik level & Direksi puas.</div></div>
@@ -139,7 +139,7 @@ export class UI {
     return { html, sig };
   }
   showArcadePick(gameId) {
-    const g = this.g, s = g.s, names = { flappy: 'Terbang Menembus Firewall', race: 'Lomba Lari Kantor', pole: 'Panjat Pinang' };
+    const g = this.g, s = g.s, names = { flappy: 'Terbang Menembus Firewall', race: 'Lomba Lari Kantor', car: 'Balap Mobil' };
     const list = [...s.employees].filter(e => !e.leaving).map(e => ({ e, c: g.arcadeCan(e.id) })).sort((a, b) => b.c.ok - a.c.ok || b.e.energy - a.e.energy);
     const root = this.openModal(`<div class="big-emoji">🎮</div><h2>${names[gameId]}</h2><p>Pilih karyawan yang bermain (energi tinggi = lebih jago).</p>
       <div class="sel-list" style="max-height:44dvh;overflow:auto">${list.map(({ e, c }) => `<button class="sel-item" data-id="${e.id}" ${c.ok ? '' : 'disabled'}><div class="av sm" style="--rc:${RARITY[e.rarity].color}"><img src="${portrait(e.look, e.spec, 'excited', 40)}" alt=""></div>
@@ -162,7 +162,7 @@ export class UI {
       const rivals = [...others].sort(() => Math.random() - 0.5).slice(0, 4);
       while (rivals.length < 4) { const sp = ['dev', 'ops', 'ctrl', 'sec', 'dba', 'pm'][rivals.length % 6], r = makeEmployee(sp, 'N', [...g.s.employees.map(x => x.name), ...rivals.map(x => x.name)]); r.skill = 40 + Math.floor(Math.random() * 35); rivals.push(r); }
       p = playRace(host, { emp, rivals });
-    } else p = playPole(host, { emp, cheerers: [...others].sort(() => Math.random() - 0.5).slice(0, 2) });
+    } else p = playCar(host, { emp });
     p.then(res => {
       this.closeModal(); g.arcadeRecord(empId, gameId, res); sfx(res.gems ? 'win' : 'lose');
       const r2 = this.openModal(`<div class="big-emoji">${res.gems ? '💎' : '🥲'}</div><h2>${res.gems ? `+${res.gems} Permata!` : 'Belum beruntung…'}</h2><p>${esc(emp.name)} ${esc(res.label)}.<br>Jatah main hari ini: ${g.arcadeLeft()}/5</p>
