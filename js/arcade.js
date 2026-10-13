@@ -1,6 +1,6 @@
 // Arcade kantor: tiga permainan singkat dengan karakter karyawan. Hadiahnya permata 💎.
-import { drawChibi } from './chibi.js?v=4.3.3';
-import { sfx } from './audio.js?v=4.3.3';
+import { drawChibi } from './chibi.js?v=4.3.4';
+import { sfx } from './audio.js?v=4.3.4';
 
 const W = 340, H = 440;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -137,7 +137,7 @@ export function playCar(host, { emp }) {
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
     const finish = () => { if (over) return; over = true; finished = t >= DUR; sfx(finished || t > 16 ? 'win' : 'lose'); const gems = clamp(Math.floor(t / 8), 0, 5) + (finished ? 1 : 0); const m = Math.round(dist / 10); setTimeout(() => { stop(); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); resolve({ score: m, gems, label: finished ? `finis ${m} m tanpa kalah!` : `melaju ${m} m` }); }, 1200); };
     const carColors = ['#e5484d', '#5ab8f5', '#ffd84d', '#8f8cf2', '#ff9f43', '#3fbf7f'];
-    const speedNow = () => 175 + Math.min(1, t / DUR) * 125;          // sedang: 175 → 300 px/dtk
+    const speedNow = () => 155 + Math.min(1, t / DUR) * 110;          // sedang: 155 → 265 px/dtk
     const spawnRow = () => {
       const cnt = t < 14 ? 1 : t < 28 ? (Math.random() < 0.45 ? 2 : 1) : (Math.random() < 0.5 ? 2 : Math.random() < 0.25 ? 3 : 1);
       const lanes = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, Math.min(cnt, 3));
@@ -155,8 +155,8 @@ export function playCar(host, { emp }) {
       if (!started) { count += dt; if (count >= 2) { started = true; sfx('pop'); } t = 0; }
       else if (!over) {
         const sp = speedNow(); scroll = (scroll + sp * dt) % 60; dist += sp * dt; scoreEl.textContent = Math.round(dist / 10) + ' m';
-        if (left || right) target = clamp(target + (right - left) * 190 * dt, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2);
-        const dx = target - x, mv = 215 * dt; x += Math.abs(dx) <= mv ? dx : Math.sign(dx) * mv;
+        if (left || right) target = clamp(target + (right - left) * 115 * dt, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2);
+        const dx = target - x, mv = 120 * dt; x += Math.abs(dx) <= mv ? dx : Math.sign(dx) * mv;
         spawn -= dt; if (spawn <= 0) { spawnRow(); spawn = Math.max(0.5, 0.95 - t / DUR * 0.4) * (190 / sp) * 1.15; }
         for (const c of cars) c.y += sp * (c.kind === 'cone' ? 1 : 0.62) * dt;   // mobil lain melaju lebih lambat dari kita, kerucut diam
         for (const c of cars) {
