@@ -19,8 +19,8 @@ const r2 = v => Math.round(v * 100) / 100;
 export const V_X = 6.6, C1_Y = 5.0, C2_Y = 10.0;
 // indeks meja = departemen*9 + baris*3 + kolom (maks 9 meja / departemen)
 // baris 3 (meja 7-9) berada di Gedung Tambahan sisi selatan
-export const DESK_POS = { ctrl: { x: [0.7, 2.65, 4.6], y: [6.8, 9.0, 17.5] }, dev: { x: [7.4, 9.35, 11.3], y: [6.8, 9.0, 17.5] }, ops: { x: [0.7, 2.65, 4.6], y: [11.5, 13.7, 19.8] } };
-const OPS_ANNEX_X = [14.2, 16.15, 18.1];
+export const DESK_POS = { ctrl: { x: [0.7, 2.65, 4.6], y: [6.8, 9.0, 16.8] }, dev: { x: [7.4, 9.35, 11.3], y: [6.8, 9.0, 16.8] }, ops: { x: [0.7, 2.65, 4.6], y: [11.5, 13.7, 16.8] } };
+const OPS_ANNEX_X = [14.4, 16.35, 18.3];
 export const deskXY = i => { const d = DEPT_KEYS[Math.floor(i / 9)], k = i % 9, row = Math.floor(k / 3); return { x: d === 'ops' && row === 2 ? OPS_ANNEX_X[k % 3] : DESK_POS[d].x[k % 3], y: DESK_POS[d].y[row] }; };
 export const POOL_SLOTS = [[23.0, 3.4], [24.8, 3.4], [23.0, 5.0], [24.8, 5.0]];
 export const MEET_SEATS = [[17.3, 11.7], [18.7, 11.7], [20.1, 11.7], [17.3, 14.4], [18.7, 14.4], [20.1, 14.4]];
@@ -83,6 +83,7 @@ function toV(p) {
   if (p.x >= 21 && p.y > 10.4) return [{ x: 21.55, y: p.y }, { x: 21.55, y: C2_Y }, { x: V_X, y: C2_Y }];   // Ruang Aula
   if (p.x >= 21) return [{ x: p.x, y: C2_Y }, { x: V_X, y: C2_Y }];                       // area kolam renang (timur)
   if (p.y < 5.3) return [{ x: p.x, y: C1_Y }, { x: V_X, y: C1_Y }];                      // area belakang
+  if (p.y >= 15.4 && p.x >= 13.7) return [{ x: 14.1, y: p.y }, { x: 14.1, y: 18.5 }, { x: V_X, y: 18.5 }];   // Gedung Tambahan Ops: lewat lorong selatan
   if (p.y >= 15.4) return [{ x: V_X, y: p.y }];                                            // Gedung Tambahan (selatan)
   if (p.y >= 10.4 && p.x >= 11.1) return [{ x: p.x, y: C2_Y }, { x: V_X, y: C2_Y }];      // taman bermain
   return [{ x: V_X, y: p.y }];                                                             // ruangan (jalan di lorong belakang meja)

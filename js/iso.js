@@ -58,10 +58,10 @@ export const zoneAt = (gx, gy) => (gy < 0 ? 'dining' : gx >= 21 ? (gy >= 10.4 ? 
 // Ruangan tumbuh mengikuti jumlah meja: semakin banyak karyawan, semakin lebar kantornya
 export const roomEnd = (g, d) => { const n = Math.min(3, g.s.deskCount[d]); return d === 'dev' ? 7.4 + 1.95 * n + 0.65 : 0.7 + 1.95 * n + 0.9; };
 // baris kedua meja (meja ke-4..6) membuat ruangan makin dalam
-export const annexEnd = (g, d) => { const m = Math.min(3, Math.max(0, g.s.deskCount[d] - 6)); return d === 'ops' ? 14.2 + 1.95 * m + 0.65 : d === 'dev' ? 7.4 + 1.95 * m + 0.65 : 0.7 + 1.95 * m + 0.9; };
+export const annexEnd = (g, d) => { const m = Math.min(3, Math.max(0, g.s.deskCount[d] - 6)); return d === 'ops' ? 14.4 + 1.95 * m + 0.65 : d === 'dev' ? 7.4 + 1.95 * m + 0.65 : 0.7 + 1.95 * m + 0.9; };
 export const roomRects = g => { const dc = g.s.deskCount, two = d => dc[d] > 3; return {
   ctrl: [0.3, 5.5, roomEnd(g, 'ctrl'), two('ctrl') ? 10.0 : 8.2], dev: [7.0, 5.5, roomEnd(g, 'dev'), two('dev') ? 10.0 : 8.2], ops: [0.3, 10.4, roomEnd(g, 'ops'), two('ops') ? 15 : 12.7], server: [7.0, 10.4, 11.0, 15], play: [11.2, 10.4, 16, 15],
-  ctrlA: [0.3, 15.6, annexEnd(g, 'ctrl'), 20.2], devA: [7.0, 15.6, annexEnd(g, 'dev'), 20.2], opsA: [13.8, 18.6, annexEnd(g, 'ops'), 22.2]
+  ctrlA: [0.3, 15.6, annexEnd(g, 'ctrl'), 18.0], devA: [7.0, 15.6, annexEnd(g, 'dev'), 18.0], opsA: [14.0, 15.6, annexEnd(g, 'ops'), 18.0]
 }; };
 // apakah petak (cx,cy) sudah dibangun, atau masih lahan kosong
 export function isBuilt(g, cx, cy) {
@@ -69,10 +69,11 @@ export function isBuilt(g, cx, cy) {
   if (cy < 0) return cx < 6 && cy > -3 * (g.s.fac.dining || 1);                                   // Ruang Makan (perluasan pantry ke utara)
   if (cy >= 15.4) {                                                       // Gedung Tambahan (selatan): hanya dibangun setelah meja ke-7+
     const dc = g.s.deskCount, R = roomRects(g), inR = k => cx >= R[k][0] && cx < R[k][2] && cy >= R[k][1] && cy < R[k][3];
-    if (dc.ctrl > 6 && (inR('ctrlA') || (cx < 7 && cy < 18.0))) return true;
+    if (dc.ctrl > 6 && inR('ctrlA')) return true;
     if (dc.dev > 6 && inR('devA')) return true;
-    if (dc.ops > 6 && (inR('opsA') || (cy >= 18.6 && cy < 20.0 && cx >= 6 && cx < 14.2))) return true;
-    if (cx >= 6 && cx < 7 && (dc.ctrl > 6 || dc.dev > 6 || dc.ops > 6)) return cy < (dc.ops > 6 ? 22 : 20.2);
+    if (dc.ops > 6 && inR('opsA')) return true;
+    if (dc.ops > 6 && cy >= 18 && cy < 19 && cx >= 6 && cx < R.opsA[2]) return true;                  // lorong selatan menuju Tambahan Ops
+    if (cx >= 6 && cx < 7 && (dc.ctrl > 6 || dc.dev > 6 || dc.ops > 6)) return cy < (dc.ops > 6 ? 19 : 18);   // lorong tegak
     return false;
   }
   if (cx >= 21) return g.s.fac.pool > 0 && cy < 10.3;                      // area kolam renang                      // area kolam renang (dibangun setelah dibeli)
@@ -95,7 +96,7 @@ export function drawFloor(ctx, g, t) {
   for (let gy = -9; gy < 27; gy++) for (let gx = 0; gx < GWD; gx++) {
     const cx = gx + 0.5, cy = gy + 0.5;
     let z = zoneAt(cx, cy);
-    if ((cy > 4.0 && cy < 5.0) || (cx > 6.0 && cx < 7.0 && cy >= 5.0)) z = 'corr';
+    if ((cy > 4.0 && cy < 5.0) || (cx > 6.0 && cx < 7.0 && cy >= 5.0) || (cy >= 18 && cy < 19)) z = 'corr';
     if (!isBuilt(g, cx, cy)) continue;                                         // tidak ada lahan kosong: hanya bagian yang sudah dibangun
     const c = FLOORS[z], col = z === 'play' ? c[(gx + gy) % 4] : c[(gx + gy) % 2];
     poly(ctx, [P(gx, gy), P(gx + 1, gy), P(gx + 1, gy + 1), P(gx, gy + 1)], col, 'rgba(0,50,30,0.10)', 0.8);
@@ -169,7 +170,7 @@ function banner(c, u, v, w, text, color = '#245a40') {
   c.fillStyle = '#fff'; c.font = font(900, 9.5); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, u + w / 2, v + 9.5);
 }
 export function drawWalls(ctx, g, t, hour, using) {
-  const s = g.s, W = s.fac.pool > 0 ? 28 : 21, H = s.deskCount.ctrl > 6 ? 20.2 : 15, HO = GHT;
+  const s = g.s, W = s.fac.pool > 0 ? 28 : 21, H = s.deskCount.ctrl > 6 ? 18.0 : 15, HO = GHT;
   const BX = 6, BY = -3 * (s.fac.dining || 1);                                   // tonjolan Ruang Makan di utara pantry
   const lw = (z0, z1, col) => poly(ctx, [P(0, BY, z0), P(0, H, z0), P(0, H, z1), P(0, BY, z1)], col, null);
   const bw = (x0, x1, y, z0, z1, col) => poly(ctx, [P(x0, y, z0), P(x1, y, z0), P(x1, y, z1), P(x0, y, z1)], col, null);
@@ -327,8 +328,8 @@ export function collectProps(g, t, hour, using, push) {
   // Gedung Tambahan (selatan): muncul setelah meja ke-7 di tiap departemen dibeli
   const dcX = s.deskCount;
   if (dcX.ctrl > 6) { partition(push, 'x', 15.6, 0.3, RC.ctrlA[2]); push(1002, ctx => roomSign(ctx, 0.5, 15.6, Math.max(3.4, RC.ctrlA[2] - 0.8), 'PENGENDALIAN · TAMBAHAN', 'Gedung Tambahan', 'rgba(42,127,142,0.92)')); }
-  if (dcX.dev > 6) { partition(push, 'x', 15.6, 7.0, RC.devA[2]); partition(push, 'y', 7.0, 15.6, 20.2, [[16.7, 17.3]]); push(1002, ctx => roomSign(ctx, 7.3, 15.6, Math.max(3.4, RC.devA[2] - 7.7), 'PENGEMBANGAN · TAMBAHAN', 'Gedung Tambahan', 'rgba(30,125,80,0.92)')); }
-  if (dcX.ops > 6) { partition(push, 'x', 18.6, 13.8, RC.opsA[2]); partition(push, 'y', 13.8, 18.6, 22.2, [[19.0, 19.7]]); push(1002, ctx => roomSign(ctx, 14.0, 18.6, Math.max(3.4, RC.opsA[2] - 14.4), 'OPERASIONAL · TAMBAHAN', 'Gedung Tambahan', 'rgba(130,130,30,0.92)')); }
+  if (dcX.dev > 6) { partition(push, 'x', 15.6, 7.0, RC.devA[2]); partition(push, 'y', 7.0, 15.6, 18.0, [[15.9, 16.9]]); push(1002, ctx => roomSign(ctx, 7.3, 15.6, Math.max(3.4, RC.devA[2] - 7.7), 'PENGEMBANGAN · TAMBAHAN', 'Gedung Tambahan', 'rgba(30,125,80,0.92)')); }
+  if (dcX.ops > 6) { partition(push, 'x', 15.6, 14.0, RC.opsA[2]); partition(push, 'y', 14.0, 15.6, 18.0, [[15.9, 16.9]]); push(1002, ctx => roomSign(ctx, 14.2, 15.6, Math.max(3.4, RC.opsA[2] - 14.6), 'OPERASIONAL · TAMBAHAN', 'Gedung Tambahan', 'rgba(130,130,30,0.92)')); }
 
   // --- Ruang Kepala Divisi ---
   partition(push, 'y', 16.0, 0.3, 10.0, [[4.2, 5.8]]);
