@@ -353,3 +353,9 @@ body {
   .dir-info { min-width: 0; } .dir-name b { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
   #nav { gap: 4px; padding-left: 6px; padding-right: 6px; } #nav button { min-width: 0; } #nav .nl { font-size: 9.5px; } #nav .ni { font-size: 18px; }
 }
+
+/* notifikasi yang bisa diklik di tab Tim */
+.notif { cursor: pointer; padding: 6px 8px; border-radius: 10px; background: rgba(229, 72, 77, 0.07); } .notif:hover, .notif:active { background: rgba(229, 72, 77, 0.16); }
+.notif .go { display: inline-block; margin-left: 4px; font-weight: 900; color: #c0392b; }
+.card.focus { animation: cardFlash 1.6s ease-out 1; }
+@keyframes cardFlash { 0% { box-shadow: 0 0 0 6px rgba(255, 216, 77, 0.95); } 100% { box-shadow: 0 0 0 3px #bfe8cf; } }

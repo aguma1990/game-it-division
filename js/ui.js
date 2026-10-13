@@ -1,12 +1,12 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { BANKRUPT_LIMIT, QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.6';
-import { portrait, drawMochi } from './chibi.js?v=4.3.6';
-import { sfx, setSound, isSound } from './audio.js?v=4.3.6';
-import { playPatchRush } from './minigame.js?v=4.3.6';
-import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.6';
-import { hasSave, clearSave } from './store.js?v=4.3.6';
-import { genLook, makeEmployee } from './game.js?v=4.3.6';
-import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.6';
+import { BANKRUPT_LIMIT, QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.7';
+import { portrait, drawMochi } from './chibi.js?v=4.3.7';
+import { sfx, setSound, isSound } from './audio.js?v=4.3.7';
+import { playPatchRush } from './minigame.js?v=4.3.7';
+import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.7';
+import { hasSave, clearSave } from './store.js?v=4.3.7';
+import { genLook, makeEmployee } from './game.js?v=4.3.7';
+import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.7';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);
@@ -39,7 +39,7 @@ export class UI {
     $('#dirBtn').addEventListener('click', () => { sfx('tap'); this.showSettings(); });
     $('#panelBody').addEventListener('click', e => this.onPanelClick(e));
     this.scene.onTap = h => this.onSceneTap(h);
-    g.on('toast', t => this.toast(t.text, t.kind));
+    g.on('toast', t => this.toast(t.text, t.kind, t.go));
     g.on('sfx', n => sfx(n));
     g.on('change', () => { this.render(true); this.hud(true); });
     g.on('levelup', d => this.enqueue(() => this.showLevelUp(d)));
@@ -282,13 +282,13 @@ export class UI {
     let html = `<div class="sec-title"><span>Tim kamu (${crew.length}/${g.totalDesks()} meja)</span></div>`;
     if (!crew.length) html += `<div class="empty"><span class="big">🪑</span>Belum ada karyawan.</div>`;
     const flagged = crew.filter(e => g.suggestFor(e)), adv = g.loadAdvice();
-    if (flagged.length || adv.length) html += `<div class="card" style="border:2px solid #e5484d;background:#fff6f6"><div class="t-title">💡 Saran sistem untuk Kepala Divisi</div>${adv.map(x => `<div class="t-sub" style="margin-top:4px">📈 <b>${DEPTS[x.dept].name}</b> kebanjiran tiket (${x.open} tiket / ${x.staff} orang) → disarankan <b>rekrut karyawan</b> (lihat kandidat di bawah)</div>`).join('')}${flagged.map(e => { const sg = g.suggestFor(e); return `<div class="t-sub" style="margin-top:4px"><b>${esc(e.name)}</b> (${DEPTS[deptOfSpec(e.spec)].name}) → ${sg.kind === 'fire' ? '🚪 disarankan <b>dipecat</b>' : '📄 disarankan <b>Surat Peringatan</b>'} · ${sg.why}</div>`; }).join('')}</div>`;
+    if (flagged.length || adv.length) html += `<div class="card" style="border:2px solid #e5484d;background:#fff6f6"><div class="t-title">💡 Saran sistem untuk Kepala Divisi</div>${adv.map(x => `<div class="t-sub notif" data-act="gotocand" style="margin-top:4px">📈 <b>${DEPTS[x.dept].name}</b> kebanjiran tiket (${x.open} tiket / ${x.staff} orang) → disarankan <b>rekrut karyawan</b> <span class="go">Lihat kandidat 👉</span></div>`).join('')}${flagged.map(e => { const sg = g.suggestFor(e); return `<div class="t-sub notif" data-act="gotoemp" data-id="${e.id}" style="margin-top:4px"><b>${esc(e.name)}</b> (${DEPTS[deptOfSpec(e.spec)].name}) → ${sg.kind === 'fire' ? '🚪 disarankan <b>dipecat</b>' : '📄 disarankan <b>Surat Peringatan</b>'} · ${sg.why} <span class="go">Lihat karyawan 👉</span></div>`; }).join('')}</div>`;
     for (const dk of DEPT_KEYS) {
       const list = crew.filter(e => deptOfSpec(e.spec) === dk); if (!list.length) continue;
       const D = DEPTS[dk];
       html += `<div class="sec-title" style="border-left:6px solid ${D.color};padding-left:8px"><span>${D.emoji} ${D.name} (${list.length}/${s.deskCount[dk]} meja) · ${g.deptLoad(dk).open} tiket</span></div>` + list.map(e => this.empCard(e)).join('');
     }
-    html += `<div class="sec-title"><span>🌿 Calon karyawan (baru tiap hari)</span><button class="btn ghost sm" data-act="reroll" ${s.money < 1.5 ? 'disabled' : ''}>🔄 Cari lagi · Rp 1,5 jt</button></div>`;
+    html += `<div class="sec-title" id="cand-sec"><span>🌿 Calon karyawan (baru tiap hari)</span><button class="btn ghost sm" data-act="reroll" ${s.money < 1.5 ? 'disabled' : ''}>🔄 Cari lagi · Rp 1,5 jt</button></div>`;
     for (const c of s.candidates) {
       const sp = SPECS[c.spec], R = RARITY[c.rarity], tr = TRAITS[c.trait], full = g.freeDesk(c.spec) < 0, maxed = full && s.deskCount[deptOfSpec(c.spec)] >= DESK_MAX;
       html += `<div class="card"><div class="row"><div class="av" style="--rc:${R.color}"><img src="${portrait(c.look, c.spec, 'happy', 72)}" alt=""><span class="rar">${R.name}</span></div>
@@ -397,6 +397,8 @@ export class UI {
       case 'summon': sfx('tap'); this.showSummonDialog(id); return;
       case 'reroll': g.rerollCandidates(); break;
       case 'buyfac': g.buyFacility(k); break;
+      case 'gotoemp': sfx('tap'); this.goTo({ tab: 'team', focus: id }); return;
+      case 'gotocand': sfx('tap'); this.goTo({ tab: 'team', anchor: 'cand-sec' }); return;
       case 'buysys': g.buySystem(k); break;
       case 'maint': g.fixAsset(k, b.dataset.h || 'service'); break;
       case 'buydesk': g.buyDesk(k); break;
@@ -487,10 +489,17 @@ export class UI {
   }
 
   // ---------- Toast ----------
-  toast(text, kind = 'info') {
+  // Toast bisa diklik (opsi go) untuk langsung menuju tab/karyawan terkait
+  goTo(go) {
+    if (!go) return; sfx('tap'); this.openTab(go.tab, go.focus || null);
+    const e = go.focus && this.g.emp(go.focus); if (e) this.scene.focusGrid(e.x, e.y);
+    if (go.anchor) requestAnimationFrame(() => { const el = document.getElementById(go.anchor); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+  }
+  toast(text, kind = 'info', go) {
     const box = $('#toasts');
     while (box.children.length >= 3) box.firstChild.remove();
-    const el = document.createElement('div'); el.className = `toast ${kind}`; el.textContent = text; box.appendChild(el);
+    const el = document.createElement('div'); el.className = `toast ${kind}`; el.textContent = go ? text + ' 👆' : text; box.appendChild(el);
+    if (go) { el.style.cursor = 'pointer'; el.style.pointerEvents = 'auto'; el.addEventListener('click', () => { this.goTo(go); el.remove(); }); }
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 3200);
   }
 

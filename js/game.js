@@ -3,8 +3,8 @@ import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
   fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL, BANKRUPT_LIMIT
-} from './data.js?v=4.3.6';
-import { EVENTS } from './events.js?v=4.3.6';
+} from './data.js?v=4.3.7';
+import { EVENTS } from './events.js?v=4.3.7';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
@@ -236,7 +236,7 @@ export class Game {
 
   // ---------- Util ----------
   addLog(t) { this.s.log.unshift(`Hari ${this.s.day}: ${t}`); this.s.log.length = Math.min(this.s.log.length, 40); }
-  toast(text, kind = 'info') { this.emit('toast', { text, kind }); }
+  toast(text, kind = 'info', go) { this.emit('toast', { text, kind, go }); }
   addMoney(v, kind) {
     this.s.money = Math.round((this.s.money + v) * 100) / 100;
     if (v > 0) this.s.week.income += v; else this.s.week.expense += -v;
@@ -299,7 +299,7 @@ export class Game {
     if (!this.loadFlag) this.loadFlag = {};
     for (const k of DEPT_KEYS) {
       const L = this.deptLoad(k), was = !!this.loadFlag[k]; this.loadFlag[k] = L.need;
-      if (L.need && !was) { this.toast(`📈 ${DEPTS[k].name} kebanjiran tiket (${L.open} tiket untuk ${L.staff} orang). Disarankan rekrut karyawan baru!`, 'warn'); this.emit('sfx', 'alert'); this.emit('change'); }
+      if (L.need && !was) { this.toast(`📈 ${DEPTS[k].name} kebanjiran tiket (${L.open} tiket untuk ${L.staff} orang). Disarankan rekrut karyawan baru!`, 'warn', { tab: 'team', anchor: 'cand-sec' }); this.emit('sfx', 'alert'); this.emit('change'); }
     }
   }
   betterCand(e) { const d = deptOfSpec(e.spec); return this.s.candidates.filter(c => deptOfSpec(c.spec) === d && c.skill >= e.skill + 12).sort((a, b) => b.skill - a.skill)[0] || null; }
@@ -1047,7 +1047,7 @@ export class Game {
     for (const e of this.s.employees) {
       if (e.leaving) continue;
       const sg = this.suggestFor(e), k = sg ? sg.kind : '';
-      if ((e.suggK || '') !== k) { e.suggK = k; if (k) { this.toast(`💡 Saran: ${e.name} ${k === 'fire' ? 'sebaiknya dipecat' : 'perlu Surat Peringatan'} (${sg.why})`, 'warn'); this.emit('sfx', 'alert'); this.emit('change'); } }
+      if ((e.suggK || '') !== k) { e.suggK = k; if (k) { this.toast(`💡 Saran: ${e.name} ${k === 'fire' ? 'sebaiknya dipecat' : 'perlu Surat Peringatan'} (${sg.why})`, 'warn', { tab: 'team', focus: e.id }); this.emit('sfx', 'alert'); this.emit('change'); } }
     }
   }
   // ---------- Makan siang di Ruang Makan ----------

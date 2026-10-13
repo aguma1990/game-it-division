@@ -1,5 +1,5 @@
 // Mini-game "Patch Rush": tap bug lucu secepat mungkin, hindari data nasabah!
-import { sfx } from './audio.js?v=4.3.6';
+import { sfx } from './audio.js?v=4.3.7';
 
 const DURATION = 12;
 const KINDS = [
