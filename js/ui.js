@@ -1,12 +1,12 @@
 // Antarmuka DOM: HUD, panel, modal, toast, layar judul.
-import { BANKRUPT_LIMIT, QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.5';
-import { portrait, drawMochi } from './chibi.js?v=4.3.5';
-import { sfx, setSound, isSound } from './audio.js?v=4.3.5';
-import { playPatchRush } from './minigame.js?v=4.3.5';
-import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.5';
-import { hasSave, clearSave } from './store.js?v=4.3.5';
-import { genLook, makeEmployee } from './game.js?v=4.3.5';
-import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.5';
+import { BANKRUPT_LIMIT, QUEST_TPL, SYSTEMS, DIFFS, ECONS, LUNCH_MENUS, QUIRKS, SPECS, TRAITS, RARITY, PRIORITY, FACILITIES, DECOR, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, LEVEL_TITLES, xpNeeded, MISSIONS, fmtMoney } from './data.js?v=4.3.6';
+import { portrait, drawMochi } from './chibi.js?v=4.3.6';
+import { sfx, setSound, isSound } from './audio.js?v=4.3.6';
+import { playPatchRush } from './minigame.js?v=4.3.6';
+import { playFlappy, playRace, playCar } from './arcade.js?v=4.3.6';
+import { hasSave, clearSave } from './store.js?v=4.3.6';
+import { genLook, makeEmployee } from './game.js?v=4.3.6';
+import { NAMES_F, NAMES_M, SURNAMES } from './data.js?v=4.3.6';
 const randomName = female => { const a = female ? NAMES_F : NAMES_M; return `${a[Math.floor(Math.random() * a.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`; };
 
 const $ = s => document.querySelector(s);

@@ -1,5 +1,5 @@
 // Event acak ala insiden kantor TI bank, dibuat imut.
-import { SPECS, fmtMoney } from './data.js?v=4.3.5';
+import { SPECS, fmtMoney } from './data.js?v=4.3.6';
 
 const r1 = v => Math.round(v * 10) / 10;
 const rnd = (a, b) => a + Math.random() * (b - a);

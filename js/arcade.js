@@ -1,6 +1,6 @@
 // Arcade kantor: tiga permainan singkat dengan karakter karyawan. Hadiahnya permata 💎.
-import { drawChibi } from './chibi.js?v=4.3.5';
-import { sfx } from './audio.js?v=4.3.5';
+import { drawChibi } from './chibi.js?v=4.3.6';
+import { sfx } from './audio.js?v=4.3.6';
 
 const W = 340, H = 440;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -123,17 +123,17 @@ export function playRace(host, { emp, rivals }) {
 // ===== 3) Balap Mobil (geser kiri-kanan, hindari lalu lintas) =====
 export function playCar(host, { emp }) {
   return new Promise(resolve => {
-    const { cv, ctx, scoreEl } = frame(host, '🏎️ Balap Mobil', 'Geser jari / mouse ke kiri-kanan (atau tombol ← →) untuk menghindari mobil & kerucut. Bertahan 45 detik! Punya 2 nyawa ❤️.');
+    const { cv, ctx, scoreEl } = frame(host, '🏎️ Balap Mobil', 'Ketuk sisi kiri/kanan mobil (atau geser jari, tombol ← →) untuk bergeser sedikit demi sedikit, menghindari mobil & kerucut. Bertahan 45 detik! Punya 2 nyawa ❤️.');
     const ROAD_L = 50, ROAD_R = 290, LANES = 4, LW = (ROAD_R - ROAD_L) / LANES, CW = 30, CH = 52, CY = 360, DUR = 45;
     const laneX = i => ROAD_L + LW * (i + 0.5);
     let x = laneX(1.5), target = x, t = 0, started = false, over = false, hearts = 2, inv = 0, scroll = 0, spawn = 0.8, cars = [], trees = [], dist = 0, left = 0, right = 0, shake = 0, count = 0, finished = false;
     for (let i = 0; i < 6; i++) trees.push({ x: Math.random() < 0.5 ? 14 + Math.random() * 26 : 300 + Math.random() * 28, y: i * 80, s: 0.8 + Math.random() * 0.5 });
-    // Satu ketukan = pindah SATU lajur (pelan); geser jari = bergeser relatif mengikuti jari
-    const lo = ROAD_L + CW / 2 + 2, hi = ROAD_R - CW / 2 - 2; let lastX = null, moved = 0, downX = 0;
+    // Satu ketukan = bergeser sedikit (16 px, pelan); geser jari = bergeser relatif mengikuti jari
+    const STEP = 16, lo = ROAD_L + CW / 2 + 2, hi = ROAD_R - CW / 2 - 2; let lastX = null, moved = 0, downX = 0;
     const px = e => { const b = cv.getBoundingClientRect(); return (e.clientX - b.left) / b.width * W; };
     cv.addEventListener('pointerdown', e => { e.preventDefault(); if (cv.setPointerCapture) cv.setPointerCapture(e.pointerId); lastX = px(e); downX = lastX; moved = 0; });
-    cv.addEventListener('pointermove', e => { if (lastX === null) return; const cx = px(e), d = cx - lastX; lastX = cx; moved += Math.abs(d); target = clamp(target + d * 0.8, lo, hi); });
-    const up = () => { if (lastX === null) return; if (moved < 8) { target = clamp(target + (downX < x ? -LW : LW), lo, hi); } lastX = null; };
+    cv.addEventListener('pointermove', e => { if (lastX === null) return; const cx = px(e), d = cx - lastX; lastX = cx; moved += Math.abs(d); target = clamp(target + d * 0.5, lo, hi); });
+    const up = () => { if (lastX === null) return; if (moved < 8) { target = clamp(target + (downX < x ? -STEP : STEP), lo, hi); } lastX = null; };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', () => { lastX = null; });
     const kd = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') { left = 1; e.preventDefault(); } if (e.code === 'ArrowRight' || e.code === 'KeyD') { right = 1; e.preventDefault(); } };
     const ku = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') left = 0; if (e.code === 'ArrowRight' || e.code === 'KeyD') right = 0; };
@@ -158,8 +158,8 @@ export function playCar(host, { emp }) {
       if (!started) { count += dt; if (count >= 2) { started = true; sfx('pop'); } t = 0; }
       else if (!over) {
         const sp = speedNow(); scroll = (scroll + sp * dt) % 60; dist += sp * dt; scoreEl.textContent = Math.round(dist / 10) + ' m';
-        if (left || right) target = clamp(target + (right - left) * 85 * dt, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2);
-        const dx = target - x, mv = 85 * dt; x += Math.abs(dx) <= mv ? dx : Math.sign(dx) * mv;
+        if (left || right) target = clamp(target + (right - left) * 55 * dt, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2);
+        const dx = target - x, mv = 55 * dt; x += Math.abs(dx) <= mv ? dx : Math.sign(dx) * mv;
         spawn -= dt; if (spawn <= 0) { spawnRow(); spawn = Math.max(0.5, 0.95 - t / DUR * 0.4) * (190 / sp) * 1.15; }
         for (const c of cars) c.y += sp * (c.kind === 'cone' ? 1 : 0.62) * dt;   // mobil lain melaju lebih lambat dari kita, kerucut diam
         for (const c of cars) {
