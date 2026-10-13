@@ -16,6 +16,27 @@
   <title>Neko Bank IT</title>
 </head>
 <body>
+  <script>
+    // Diagnostik: bila game gagal dimulai (browser lama / dibuka dari file://), tampilkan penjelasan alih-alih layar kosong.
+    (function () {
+      var errs = [];
+      window.addEventListener('error', function (e) { errs.push(e.message || 'error'); });
+      window.addEventListener('unhandledrejection', function (e) { errs.push(String(e.reason)); });
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (window.__game) return;
+          var d = document.createElement('div');
+          d.style.cssText = 'position:fixed;inset:0;z-index:999;background:#10372b;color:#fff;font:16px/1.5 system-ui,sans-serif;padding:24px;overflow:auto';
+          var file = location.protocol === 'file:';
+          d.innerHTML = '<h2 style="margin:0 0 8px">Neko Bank IT belum bisa dibuka 😿</h2>' +
+            (file ? '<p>Game ini tidak bisa dibuka langsung dari file. Buka lewat alamat web, mis. <b>https://aguma1990.github.io/game-it-division/</b>, atau jalankan server lokal (Mulai Game.command / .bat).</p>'
+              : '<p>Browser kamu mungkin terlalu lama atau ada file yang gagal dimuat. Coba: perbarui browser (Chrome/Safari terbaru), muat ulang halaman, atau hapus data situs lalu buka lagi.</p>') +
+            (errs.length ? '<p style="font-size:12px;opacity:.8">Detail: ' + String(errs[0]).replace(/</g, '&lt;') + '</p>' : '') +
+            '<p style="font-size:12px;opacity:.7">' + navigator.userAgent.replace(/</g, '&lt;') + '</p>';
+          document.body.appendChild(d);
+        }, 6000);
+      });
+    </script>
   <div id="app" hidden>
     <header id="hud">
       <div class="hud-top">

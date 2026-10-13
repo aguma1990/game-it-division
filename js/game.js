@@ -131,7 +131,7 @@ export function makeEmployee(spec, rarity, usedNames = [], forceFemale) {
 
 export class Game {
   constructor() { this.l = {}; this.s = null; this.blocking = false; this.lastSave = 0; }
-  on(ev, fn) { (this.l[ev] ||= []).push(fn); }
+  on(ev, fn) { (this.l[ev] || (this.l[ev] = [])).push(fn); }
   emit(ev, p) { (this.l[ev] || []).forEach(fn => fn(p)); }
 
   // ---------- Sesi ----------
@@ -294,7 +294,7 @@ export class Game {
   }
   loadAdvice() { return DEPT_KEYS.map(k => this.deptLoad(k)).filter(x => x.need); }
   checkLoad() {
-    this.loadFlag ||= {};
+    if (!this.loadFlag) this.loadFlag = {};
     for (const k of DEPT_KEYS) {
       const L = this.deptLoad(k), was = !!this.loadFlag[k]; this.loadFlag[k] = L.need;
       if (L.need && !was) { this.toast(`📈 ${DEPTS[k].name} kebanjiran tiket (${L.open} tiket untuk ${L.staff} orang). Disarankan rekrut karyawan baru!`, 'warn'); this.emit('sfx', 'alert'); this.emit('change'); }

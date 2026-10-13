@@ -130,7 +130,7 @@ export function playCar(host, { emp }) {
     for (let i = 0; i < 6; i++) trees.push({ x: Math.random() < 0.5 ? 14 + Math.random() * 26 : 300 + Math.random() * 28, y: i * 80, s: 0.8 + Math.random() * 0.5 });
     const rect = r => cv.getBoundingClientRect();
     const move = e => { const b = rect(); target = clamp((e.clientX - b.left) / b.width * W, ROAD_L + CW / 2 + 2, ROAD_R - CW / 2 - 2); };
-    cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture?.(e.pointerId); move(e); });
+    cv.addEventListener('pointerdown', e => { e.preventDefault(); if (cv.setPointerCapture) cv.setPointerCapture(e.pointerId); move(e); });
     cv.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') move(e); });
     const kd = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') { left = 1; e.preventDefault(); } if (e.code === 'ArrowRight' || e.code === 'KeyD') { right = 1; e.preventDefault(); } };
     const ku = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') left = 0; if (e.code === 'ArrowRight' || e.code === 'KeyD') right = 0; };
