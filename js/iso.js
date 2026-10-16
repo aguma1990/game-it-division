@@ -1,7 +1,7 @@
 // Penggambar dunia isometrik (kantor tampak dari atas): lantai, dinding, sekat kaca, furnitur, zona.
-import { TW, TH, OX, OY, SPECS, DEPTS, DEPT_KEYS } from './data.js?v=4.3.7';
-import { rr, ell, star4, shade } from './chibi.js?v=4.3.7';
-import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS, ENTRY, DINE_SEATS, hallEnd } from './game.js?v=4.3.7';
+import { TW, TH, OX, OY, SPECS, DEPTS, DEPT_KEYS } from './data.js?v=4.3.8';
+import { rr, ell, star4, shade } from './chibi.js?v=4.3.8';
+import { deskXY, SERVER_ST, PLAY_SLOTS, V_X, MEET_SEATS, ENTRY, DINE_SEATS, hallEnd } from './game.js?v=4.3.8';
 
 const TAU = Math.PI * 2;
 export const FONT = 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Nunito", system-ui, sans-serif';

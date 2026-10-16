@@ -1,8 +1,8 @@
 // Scene Canvas isometrik: kamera (geser/zoom), karyawan, Mochi, partikel, gelembung, hit-test.
-import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, DEPTS, deptOfSpec, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js?v=4.3.7';
-import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js?v=4.3.7';
-import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js?v=4.3.7';
-import * as I from './iso.js?v=4.3.7';
+import { WORLD_W, WORLD_H, OX, SPECS, FACILITIES, DEPTS, deptOfSpec, fmtMoney, DEPT_KEYS, DESK_COSTS, DESK_MAX } from './data.js?v=4.3.8';
+import { drawChibi, drawMochi, rr, ell, star4, heartPath } from './chibi.js?v=4.3.8';
+import { deskXY, route, V_X, C1_Y, ENTRY, DIR_SEAT } from './game.js?v=4.3.8';
+import * as I from './iso.js?v=4.3.8';
 
 const TAU = Math.PI * 2;
 const lerp = (a, b, t) => a + (b - a) * t;

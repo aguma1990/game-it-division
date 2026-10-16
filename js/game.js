@@ -3,8 +3,8 @@ import {
   SPECS, SPEC_KEYS, TRAITS, TRAIT_KEYS, RARITY, NAMES_F, NAMES_M, SURNAMES, HAIR_COLORS, EYE_COLORS, SKINS,
   HIJAB_COLORS, HAIR_STYLES, TASK_TEMPLATES, PRIORITY, FACILITIES, rollQuirk, DESK_COSTS, DESK_LEVELS, DESK_MAX, DEPTS, DEPT_KEYS, deptOfSpec, DECOR, xpNeeded, MISSIONS,
   fmtMoney, LUNCH_MENUS, DISHES, PARTY_OPTS, DIFFS, ECONS, SYSTEMS, QUEST_TPL, BANKRUPT_LIMIT
-} from './data.js?v=4.3.7';
-import { EVENTS } from './events.js?v=4.3.7';
+} from './data.js?v=4.3.8';
+import { EVENTS } from './events.js?v=4.3.8';
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
 export const ri = (a, b) => Math.floor(rnd(a, b + 1));
@@ -333,8 +333,8 @@ export class Game {
     return c[0];
   }
 
-  finishTask(t, e) {
-    const q = (e.mood >= 70 && e.stress < 62 && Math.random() < (e.trait === 'teliti' ? 0.9 : 0.5)) ? 'perfect' : (e.stress >= 85 && e.trait !== 'teliti' && Math.random() < 0.4 * (1 - this.sysBonus('bug')) ? 'bug' : 'ok');
+  finishTask(t, e, forceQ) {
+    const q = forceQ || ((e.mood >= 70 && e.stress < 62 && Math.random() < (e.trait === 'teliti' ? 0.9 : 0.5)) ? 'perfect' : (e.stress >= 85 && e.trait !== 'teliti' && Math.random() < 0.4 * (1 - this.sysBonus('bug')) ? 'bug' : 'ok'));
     t.state = 'done'; t.progress = t.work; t.q = q; t.claimT = 9; t.doneBy = e.id;
     e.fails = q === 'bug' ? (e.fails || 0) + 1 : e.quirk === 'lambat' && q !== 'perfect' ? (e.fails || 0) + 0.6 : Math.max(0, (e.fails || 0) - 0.5); this.checkSuggest();
     e.task = null; e.tasksDone++; e.wTasks++;
@@ -731,7 +731,8 @@ export class Game {
     const s = this.s, t = this.task(id); if (!t || t.state !== 'doing' || !t.emp) { this.toast('Tiket harus sedang dikerjakan karyawan untuk dipercepat.', 'warn'); return false; }
     const c = this.speedCost(t); if ((s.gems || 0) < c) { this.toast(`Permata kurang (butuh ${c} 💎). Main Arcade untuk dapat permata!`, 'warn'); return false; }
     s.gems -= c; t.progress = t.work; s.stat.speedups = (s.stat.speedups || 0) + 1;
-    const e = this.emp(t.emp); if (e) { this.say(e, 'Wah, kencang banget! ⚡', 2.5); this.face(e, 'excited', 3); this.emit('fx', { kind: 'stars', x: e.x, y: e.y }); }
+    const e = this.emp(t.emp); if (e) this.finishTask(t, e, 'ok');   // selesai SEKETIKA, di mana pun karyawannya (jalan, istirahat, antre)
+    if (e) { this.say(e, 'Wah, kencang banget! ⚡', 2.5); this.face(e, 'excited', 3); this.emit('fx', { kind: 'stars', x: e.x, y: e.y }); }
     this.emit('sfx', 'levelup2'); this.toast(`⚡ "${t.title}" dipercepat (−${c} 💎)`, 'good'); this.emit('change'); return true;
   }
   speedSystem(id) {
@@ -932,7 +933,10 @@ export class Game {
     let added = 0;
     for (let i = 0; i < n && this.activeTasks() < cap; i++) { this.spawnTask(); added++; }
     this.genCandidates();
-    if (s.day >= 2 && s.inbox.length < 4 && Math.random() < 0.62) this.genRequest();
+    // Proyek baru muncul berkala (maks. 2 aktif/menunggu) — tidak lagi bergantung pada keberuntungan
+    const projBusy = s.projects.length + s.inbox.filter(r => r.type === 'project').length;
+    if (s.day >= 3 && projBusy < 2 && s.day - (s.lastProjGen || 0) >= 2) { s.lastProjGen = s.day; this.genRequest('project'); }
+    else if (s.day >= 2 && s.inbox.length < 4 && Math.random() < 0.62) this.genRequest();
     // harian karyawan: pulih sedikit tiap pagi
     s.employees.forEach(e => { e.energy = clamp(e.energy + 18); e.stress = clamp(e.stress - 8); });
     this.addLog(`Hari baru! Biaya −${fmtMoney(salary + over)}, ${added} tiket baru.`);
